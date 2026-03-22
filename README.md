@@ -1,6 +1,6 @@
-# MAVEN
+# Fluke
 
-**Metro Area Vehicle Evidence Network**
+**Open-source ALPR data explorer** — a play on [Flock](https://www.flock.com)
 
 A web application for searching, importing, and managing ALPR (Automated License Plate Reader) data in the Twin Cities metro area.
 
@@ -46,17 +46,17 @@ Admin scripts use Python and `uv`.
 
 ## 🚀 Production Deployment Guide
 
-MAVEN is designed to be hosted cheaply and scale well using **PikaPods** (backend) and **Vercel** (frontend).
+Fluke is designed to be hosted cheaply and scale well using **PikaPods** (backend) and **Vercel** (frontend).
 
 ### Step 1: Deploy Backend (PikaPods)
 1. Sign up at [pikapods.com](https://www.pikapods.com).
 2. Click **Add Pod** → Search for **PocketBase** (latest v0.25.x).
 3. The smallest CPU/RAM tier is sufficient.
-4. Once running, note your pod URL (e.g., `https://maven-db.pikapods.net`).
+4. Once running, note your pod URL (e.g., `https://fluke-db.pikapods.net`).
 5. Open `https://your-pod-url/_/` and initialize your admin superuser account.
 
 **Apply the Schema:**
-Run this locally to push the MAVEN schema to your new PikaPod:
+Run this locally to push the Fluke schema to your new PikaPod:
 ```bash
 PB_URL=https://your-pod-url.pikapods.net \
 PB_ADMIN_EMAIL=your-admin@email.com \
@@ -78,7 +78,7 @@ uv run scripts/setup-schema.py
 To allow Vercel to talk to PikaPods:
 1. Log into your PocketBase admin UI (`https://your-pod-url/_/`).
 2. Go to **Settings → Application**.
-3. Add your Vercel URL (e.g., `https://maven.vercel.app`) to the **Allowed origins** list.
+3. Add your Vercel URL (e.g., `https://fluke.vercel.app`) to the **Allowed origins** list.
 
 ### Step 4: Import Data
-You can now import your ALPR `.csv` files using the **CSV Upload** tab in the MAVEN admin dashboard!
+You can now import your ALPR `.csv` files using the **CSV Upload** tab in the Fluke admin dashboard!

@@ -1,4 +1,4 @@
-# CLAUDE.md — MAVEN Project Rules
+# CLAUDE.md — Fluke Project Rules
 
 ## AI Artifacts
 - **Always save** walkthroughs, implementation plans, task lists, QA reports, and any other AI-generated documents to the `ai-artifacts/` folder in the project root
@@ -11,7 +11,7 @@
 - Scripts use inline `# /// script` dependency declarations (PEP 723)
 
 ## Project Name
-**MAVEN** — Metro Area Vehicle Evidence Network
+**Fluke** — Open-source ALPR data explorer (a play on Flock)
 
 ## Stack
 - **Backend:** PocketBase v0.25 at `http://127.0.0.1:8090`

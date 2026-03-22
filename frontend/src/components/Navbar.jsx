@@ -9,8 +9,8 @@ export default function Navbar() {
   return (
     <nav className="navbar">
       <div className="navbar-content">
-        <div className="navbar-brand" title="Metro Area Vehicle Evidence Network">
-          MAVEN
+        <div className="navbar-brand" title="Fluke — Open-source ALPR data explorer">
+          Fluke
         </div>
         <div className="navbar-links">
           <NavLink

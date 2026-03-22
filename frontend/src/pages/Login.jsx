@@ -28,8 +28,8 @@ export default function Login() {
       <div className="login-container animate-slideUp">
         <div className="login-header">
           <div className="login-icon">🔍</div>
-          <h1>MAVEN</h1>
-          <p>Metro Area Vehicle Evidence Network</p>
+          <h1>Fluke</h1>
+          <p>Open-source ALPR data explorer</p>
         </div>
 
         <form onSubmit={handleSubmit} className="login-form">
