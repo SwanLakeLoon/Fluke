@@ -29,7 +29,7 @@ def main():
         print("✅ Authenticated\n")
 
         # Get alpr_records collection
-        cols = c.get(f"{PB_URL}/api/collections", headers=headers).json()
+        cols = c.get(f"{PB_URL}/api/collections", headers=headers, params={"perPage": 200}).json()
         items = cols if isinstance(cols, list) else cols.get("items", [])
         alpr = next((col for col in items if col["name"] == "alpr_records"), None)
 

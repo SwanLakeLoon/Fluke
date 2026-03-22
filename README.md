@@ -1,6 +1,6 @@
 # Fluke
 
-**Open-source ALPR data explorer** — a play on [Flock](https://www.flock.com)
+**Open-source ALPR data explorer** — its just a Fluke!
 
 A web application for searching, importing, and managing ALPR (Automated License Plate Reader) data in the Twin Cities metro area.
 
@@ -44,41 +44,136 @@ Admin scripts use Python and `uv`.
 
 ---
 
+---
+
 ## 🚀 Production Deployment Guide
 
-Fluke is designed to be hosted cheaply and scale well using **PikaPods** (backend) and **Vercel** (frontend).
+Fluke is designed to be hosted cheaply using **PikaPods** (backend) and **Vercel** (frontend).
 
-### Step 1: Deploy Backend (PikaPods)
+> **Important:** The PocketBase *superuser* account (used to manage the database) is completely separate from the Fluke *app user* account (used to log into the Fluke web UI). You will create both.
+
+---
+
+### Step 1: Deploy PocketBase to PikaPods
+
 1. Sign up at [pikapods.com](https://www.pikapods.com).
-2. Click **Add Pod** → Search for **PocketBase** (latest v0.25.x).
-3. The smallest CPU/RAM tier is sufficient.
-4. Once running, note your pod URL (e.g., `https://fluke-db.pikapods.net`).
-5. Open `https://your-pod-url/_/` and initialize your admin superuser account.
+2. Click **Add Pod** → search for **PocketBase** (v0.25.x). The smallest tier is fine.
+3. Once the pod is running, note your pod URL (e.g., `https://your-pod.pikapods.net`).
 
-**Apply the Schema:**
-Run this locally to push the Fluke schema to your new PikaPod:
+**Create your PocketBase superuser (PikaPods v0.23+ process):**
+
+PikaPods does not prompt you to create an admin — instead, the one-time setup URL is hidden in your pod logs.
+
+1. In the PikaPods dashboard, click your pod → **More → Show Logs**
+2. Look for a line containing a URL that starts with:
+   ```
+   http://0.0.0.0:8090/_/#/pbinstal/
+   ```
+   followed by a long JWT token.
+3. Copy that URL and replace `http://0.0.0.0:8090` with your actual pod URL:
+   ```
+   https://your-pod.pikapods.net/_/#/pbinstal/<jwt-token>
+   ```
+4. Open that modified URL in your browser and create your superuser account.
+5. **Save these credentials somewhere safe** — you will need them for every admin operation.
+
+**Update the Application URL:**
+
+Once logged into your PocketBase admin panel (`https://your-pod.pikapods.net/_/`):
+
+1. Go to **Settings → Application**
+2. Change **Application URL** from `http://localhost:8090` to `https://your-pod.pikapods.net`
+3. Click **Save changes**
+
+---
+
+### Step 2: Apply the Fluke Schema
+
+Run these two scripts locally, pointing them at your live pod.
+
+> ⚠️ The env variable is `POCKETBASE_URL` (not `PB_URL`).
+
 ```bash
-PB_URL=https://your-pod-url.pikapods.net \
-PB_ADMIN_EMAIL=your-admin@email.com \
-PB_ADMIN_PASS=your-password \
+# 1. Create collections and add role field to users
+POCKETBASE_URL=https://your-pod.pikapods.net \
+PB_ADMIN_EMAIL=your-superuser@email.com \
+PB_ADMIN_PASS=your-superuser-password \
 uv run scripts/setup-schema.py
+
+# 2. Apply secure API access rules
+POCKETBASE_URL=https://your-pod.pikapods.net \
+PB_ADMIN_EMAIL=your-superuser@email.com \
+PB_ADMIN_PASS=your-superuser-password \
+uv run scripts/fix-api-rules.py
 ```
-*(Also run `scripts/fix-api-rules.py` with the same vars to ensure secure endpoints).*
 
-### Step 2: Deploy Frontend (Vercel)
-1. Push this repository to GitHub.
-2. Sign up at [vercel.com](https://vercel.com) and click **Add New → Project**.
-3. Import your GitHub repository.
-4. Set the **Root Directory** to `frontend`.
-5. Under **Environment Variables**, add:
-   - `VITE_POCKETBASE_URL` = `https://your-pod-url.pikapods.net`
-6. Click **Deploy**.
+When successful you will see `✅ alpr_records created` and `✅ duplicate_queue created`. If you see `⏭️ already exists` for everything, the script is still hitting localhost — double-check the `POCKETBASE_URL` env var name.
 
-### Step 3: Configure CORS
-To allow Vercel to talk to PikaPods:
-1. Log into your PocketBase admin UI (`https://your-pod-url/_/`).
-2. Go to **Settings → Application**.
-3. Add your Vercel URL (e.g., `https://fluke.vercel.app`) to the **Allowed origins** list.
+---
 
-### Step 4: Import Data
-You can now import your ALPR `.csv` files using the **CSV Upload** tab in the Fluke admin dashboard!
+### Step 3: Create a Fluke App User
+
+The PocketBase superuser is only for database administration. You need a separate user account to log into the Fluke web UI.
+
+1. In your PocketBase admin panel → **Collections → users → New record**
+2. Fill in:
+   - **username** — e.g. `admin` (this is what you type into the Fluke login screen)
+   - **email** — your email address
+   - **password** + **passwordConfirm** — choose a secure password
+   - **role** — select `admin`
+3. Save the record.
+
+---
+
+### Step 4: Deploy Frontend to Vercel
+
+> ⚠️ **Critical:** Vite bakes environment variables into the bundle **at build time**. The `VITE_POCKETBASE_URL` variable **must be set in Vercel before the first deploy**, or the app will point to `localhost` and logins will fail.
+
+1. Push this repo to GitHub.
+2. Sign into [vercel.com](https://vercel.com) and click **Add New → Project**.
+3. Import your GitHub repo. Select **GitHub** as the Git provider.
+4. In the project configuration:
+   - Find **Root Directory** under *Build and Output Settings* and set it to `frontend`
+   - Under **Environment Variables**, add **before clicking Deploy**:
+
+   | Key | Value |
+   |---|---|
+   | `VITE_POCKETBASE_URL` | `https://your-pod.pikapods.net` |
+
+5. Click **Deploy**.
+
+If you forget the env var and deploy first, add it in **Settings → Environment Variables** afterward, then go to **Deployments → ··· → Redeploy** to trigger a fresh build.
+
+---
+
+### Step 5: Smoke Test
+
+| Check | Expected result |
+|---|---|
+| Visit your Vercel URL | Fluke login page appears |
+| Log in with your app user | Redirected to search page |
+| DevTools console has no errors | No `127.0.0.1` or CORS errors |
+| Admin → Records | Collections visible, table loads |
+| Admin → Upload CSV | Upload and import works |
+
+---
+
+### Step 6: Import Data
+
+Upload ALPR `.csv` files using the **CSV Upload** tab in the Fluke admin dashboard, or via CLI:
+
+```bash
+POCKETBASE_URL=https://your-pod.pikapods.net \
+PB_ADMIN_EMAIL=your-superuser@email.com \
+PB_ADMIN_PASS=your-superuser-password \
+uv run scripts/import_csv.py ./data/your-file.csv
+```
+
+---
+
+### Redeploying After Code Changes
+
+Every `git push` to `main` will automatically trigger a new Vercel deploy. No action needed.
+
+For PocketBase schema changes, re-run `setup-schema.py` and `fix-api-rules.py` against the production pod URL.
+

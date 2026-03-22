@@ -45,7 +45,7 @@ def main():
         print("✅ Authenticated as superuser\n")
 
         # 2. Existing collections
-        existing = api(c, "/api/collections", "GET", token=token)
+        existing = api(c, "/api/collections?perPage=200", "GET", token=token)
         items = existing if isinstance(existing, list) else existing.get("items", [])
         names = [col["name"] for col in items]
 
