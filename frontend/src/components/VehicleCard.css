@@ -1,0 +1,130 @@
+.vehicle-card {
+  margin-bottom: var(--space-md);
+}
+
+.vc-identity {
+  margin-bottom: var(--space-md);
+}
+
+.vc-plate-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.vc-plate {
+  font-size: 1.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-primary);
+}
+
+.vc-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-sm) var(--space-lg);
+}
+
+.vc-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vc-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.vc-value {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.vc-vin {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+}
+
+.vc-title-issues {
+  font-size: 0.8rem;
+  color: var(--warning);
+}
+
+/* Sightings */
+.vc-sightings {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-sm);
+}
+
+.vc-sightings-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: var(--space-sm) 0;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.vc-sightings-toggle:hover {
+  color: var(--text-primary);
+}
+
+.vc-chevron {
+  font-size: 0.7rem;
+  transition: transform 0.2s ease;
+}
+
+.vc-chevron.open {
+  transform: rotate(180deg);
+}
+
+.vc-sightings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding-top: var(--space-sm);
+}
+
+.vc-sighting {
+  background: var(--bg-glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm) var(--space-md);
+}
+
+.vc-sighting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+}
+
+.vc-sighting-location {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.vc-sighting-date {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.vc-sighting-meta {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}

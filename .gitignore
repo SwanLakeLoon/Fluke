@@ -1,0 +1,60 @@
+# Dependencies
+frontend/node_modules/
+node_modules/
+
+# Build output
+frontend/dist/
+
+# PocketBase binary & local data
+backend/pocketbase
+backend/pb_data/
+
+# Backups
+backups/
+
+# AI artifacts (keep folder, ignore contents)
+ai-artifacts/*
+!ai-artifacts/.gitkeep
+
+# ========================
+# SENSITIVE DATA — DO NOT COMMIT
+# ========================
+
+# Source CSV data (contains PII — license plates, vehicle info)
+data/
+!data/samples/
+!data/samples/.gitkeep
+
+# Environment / secrets
+.env
+.env.*
+.env.local
+.env.production
+.env.*.local
+frontend/.env
+frontend/.env.*
+frontend/.env.local
+frontend/.env.production
+
+# ========================
+# OS / IDE
+# ========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+uv.lock
+
+# ========================
+# Logs
+# ========================
+*.log
+logs/

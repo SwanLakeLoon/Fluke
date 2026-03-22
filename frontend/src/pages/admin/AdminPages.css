@@ -1,0 +1,284 @@
+.admin-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: var(--space-lg);
+}
+
+/* Drop Zone */
+.drop-zone {
+  text-align: center;
+  padding: var(--space-3xl);
+  cursor: pointer;
+  border: 2px dashed var(--border);
+  margin-bottom: var(--space-lg);
+  transition: all 0.2s ease;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.drop-icon { font-size: 2.5rem; margin-bottom: var(--space-sm); }
+
+.drop-zone p { color: var(--text-secondary); font-size: 0.9rem; }
+
+/* Validation */
+.validation-summary {
+  background: var(--danger-dim);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.validation-summary h3 { font-size: 0.9rem; margin-bottom: var(--space-sm); color: var(--danger); }
+.val-error { font-size: 0.8rem; color: var(--text-secondary); padding: 2px 0; }
+
+/* Preview */
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+}
+
+.preview-header h3 { font-size: 1rem; }
+
+.table-wrapper { margin-bottom: var(--space-lg); }
+
+.row-error td { background: rgba(248, 113, 113, 0.05); }
+
+/* Import Result */
+.import-result { text-align: center; margin-top: var(--space-lg); }
+.import-result h3 { margin-bottom: var(--space-lg); }
+
+.result-stats {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-2xl);
+}
+
+.result-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.result-num { font-size: 2rem; font-weight: 800; }
+.result-stat span:last-child { font-size: 0.8rem; color: var(--text-muted); }
+
+/* Prior Sightings */
+.prior-sightings {
+  margin-top: var(--space-xl);
+  text-align: left;
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-lg);
+}
+
+.prior-sightings-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.prior-sightings-count {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.prior-plate-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-sm);
+  overflow: hidden;
+}
+
+.prior-plate-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--bg-secondary);
+  border: none;
+  cursor: pointer;
+  color: var(--text-primary);
+  font-family: var(--font);
+  font-size: 0.875rem;
+  transition: background 0.15s;
+  gap: var(--space-md);
+}
+
+.prior-plate-header:hover { background: var(--bg-hover); }
+
+.prior-plate-meta {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-left: var(--space-sm);
+}
+
+.prior-plate-badge {
+  font-size: 0.78rem;
+  color: var(--accent);
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.prior-plate-table {
+  border-radius: 0 !important;
+  border-top: 1px solid var(--border);
+}
+
+/* Duplicate Review */
+.dup-card {
+  margin-bottom: var(--space-md);
+}
+
+.dup-comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.dup-side h4 {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.dup-field {
+  font-size: 0.85rem;
+  padding: 2px 0;
+  color: var(--text-secondary);
+}
+
+.dup-field strong { color: var(--text-primary); }
+
+.dup-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Records Manager */
+.records-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-md);
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.records-toolbar-left {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+}
+
+.inline-edit {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  font-family: var(--font);
+  font-size: 0.875rem;
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+.inline-edit:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-input);
+  outline: none;
+}
+
+/* User Manager */
+.user-form {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.user-form .input { max-width: 250px; }
+
+/* Inline Edit Form */
+.editing-row td {
+  background: var(--bg-secondary) !important;
+  padding: var(--space-md) !important;
+}
+
+.inline-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-sm);
+}
+
+.edit-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.input-sm, .select-sm {
+  font-size: 0.85rem !important;
+  padding: 6px 10px !important;
+  height: auto !important;
+}
+
+.edit-actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Delete Confirmation Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  max-width: 440px;
+  width: 90%;
+  padding: var(--space-xl) !important;
+}
+
+@media (max-width: 768px) {
+  .dup-comparison { grid-template-columns: 1fr; }
+  .result-stats { flex-direction: column; gap: var(--space-md); }
+  .edit-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 480px) {
+  .edit-grid { grid-template-columns: 1fr; }
+}

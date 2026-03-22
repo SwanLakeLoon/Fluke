@@ -1,0 +1,187 @@
+import { useState, useEffect } from 'react';
+import { pb } from '../../api/client';
+import './AdminPages.css';
+
+export default function DuplicateReview() {
+  const [dupes, setDupes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchDupes = async () => {
+    setLoading(true);
+    try {
+      const res = await pb.collection('duplicate_queue').getList(1, 50, {
+        filter: 'status = "pending"',
+        sort: 'status',
+        expand: 'existing_record_id',
+      });
+      setDupes(res.items);
+    } catch (e) {
+      console.error('Failed to fetch duplicates:', e);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchDupes(); }, []);
+
+  const handleKeepBoth = async (dup) => {
+    if (!window.confirm("Insert the incoming record as a completely new entry?")) return;
+    try {
+      await pb.collection('alpr_records').create(dup.raw_data);
+      await pb.collection('duplicate_queue').update(dup.id, { status: 'approved' });
+      setDupes(prev => prev.filter(d => d.id !== dup.id));
+    } catch (e) {
+      console.error('Keep Both failed:', e);
+      alert('Failed: ' + e.message);
+    }
+  };
+
+  const handleReplace = async (dup) => {
+    if (!window.confirm("Overwrite the existing database record with the incoming data?")) return;
+    try {
+      if (dup.existing_record_id) {
+        await pb.collection('alpr_records').update(dup.existing_record_id, dup.raw_data);
+      } else {
+        await pb.collection('alpr_records').create(dup.raw_data);
+      }
+      await pb.collection('duplicate_queue').update(dup.id, { status: 'approved' });
+      setDupes(prev => prev.filter(d => d.id !== dup.id));
+    } catch (e) {
+      console.error('Replace failed:', e);
+      alert('Failed: ' + e.message);
+    }
+  };
+
+  const handleReject = async (dup) => {
+    try {
+      await pb.collection('duplicate_queue').update(dup.id, { status: 'rejected' });
+      setDupes(prev => prev.filter(d => d.id !== dup.id));
+    } catch (e) {
+      console.error('Reject failed:', e);
+      alert('Failed: ' + e.message);
+    }
+  };
+
+  const MatchField = ({ label, value }) => (
+    <div className="dup-field" style={{
+      borderLeft: '3px solid var(--accent)',
+      paddingLeft: '8px',
+      background: 'rgba(56, 189, 248, 0.08)',
+      borderRadius: '0 4px 4px 0',
+    }}>
+      <strong>{label}:</strong> {value || '—'}
+    </div>
+  );
+
+  const DiffField = ({ label, incoming, existing }) => {
+    const newVal = String(incoming || '—');
+    const oldVal = existing ? String(existing || '—') : null;
+    let isDifferent = oldVal !== null && newVal !== oldVal;
+    
+    // Normalize blank vs null
+    if (oldVal === '—' && incoming === '') isDifferent = false;
+    if (newVal === '—' && existing === '') isDifferent = false;
+
+    return (
+      <div className="dup-field" style={isDifferent ? { background: 'rgba(234, 179, 8, 0.15)', padding: '2px 6px', borderRadius: '4px' } : {}}>
+        <strong>{label}:</strong> {newVal}
+      </div>
+    );
+  };
+
+  return (
+    <div className="page">
+      <div className="container" style={{ maxWidth: '1000px' }}>
+        <h1 className="admin-title">Duplicate Conflict Resolution</h1>
+
+        {loading && <p style={{ color: 'var(--text-muted)' }}>Loading...</p>}
+
+        {!loading && dupes.length === 0 && (
+          <div className="search-empty animate-fadeIn">
+            <div className="search-empty-icon">✅</div>
+            <h2>No pending conflicts</h2>
+            <p>All duplicate records have been resolved.</p>
+          </div>
+        )}
+
+        {dupes.map(dup => {
+          const incData = dup.raw_data || {};
+          const exData = dup.expand?.existing_record_id || null;
+          
+          return (
+            <div key={dup.id} className="dup-card glass-card animate-fadeIn">
+              <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-md)' }}>
+                <div className="flex items-center gap-sm">
+                  <span className="badge badge-warning">Conflict</span>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    Batch: {dup.import_batch}
+                  </span>
+                </div>
+              </div>
+
+              <div className="dup-comparison" style={{ gridTemplateColumns: exData ? '1fr 1fr' : '1fr', gap: 'var(--space-xl)' }}>
+                {/* INCOMING RECORD — LEFT */}
+                <div className="dup-side" style={{ borderRight: exData ? '1px solid var(--border)' : 'none', paddingRight: exData ? 'var(--space-xl)' : 0 }}>
+                  <h4 style={{ color: 'var(--accent)' }}>Incoming CSV Record</h4>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
+                    {dup.reason}
+                  </p>
+
+                  <MatchField label="Plate"    value={incData.plate} />
+                  <DiffField  label="State"    incoming={incData.state}        existing={exData?.state} />
+                  <DiffField  label="Make/Model" incoming={incData.make ? `${incData.make} ${incData.model}` : incData.model} existing={exData ? `${exData.make} ${exData.model}` : null} />
+                  <DiffField  label="Color"    incoming={incData.color}        existing={exData?.color} />
+                  <MatchField label="Location" value={incData.location} />
+                  <MatchField label="Date"     value={incData.date ? new Date(incData.date).toLocaleDateString() : '—'} />
+                  <DiffField  label="ICE"      incoming={incData.ice}          existing={exData?.ice} />
+                  <DiffField  label="Matches Reg.?" incoming={incData.match_status} existing={exData?.match_status} />
+                  <DiffField  label="Notes"    incoming={incData.notes}        existing={exData?.notes} />
+                </div>
+
+                {/* EXISTING RECORD — RIGHT */}
+                {exData && (
+                  <div className="dup-side">
+                    <h4 style={{ color: 'var(--text-muted)' }}>Existing Database Record</h4>
+
+                    <MatchField label="Plate"    value={exData.plate} />
+                    <div className="dup-field"><strong>State:</strong> {exData.state}</div>
+                    <div className="dup-field"><strong>Make/Model:</strong> {exData.make} {exData.model}</div>
+                    <div className="dup-field"><strong>Color:</strong> {exData.color}</div>
+                    <MatchField label="Location" value={exData.location} />
+                    <MatchField label="Date"     value={exData.date ? new Date(exData.date).toLocaleDateString() : '—'} />
+                    <div className="dup-field"><strong>ICE:</strong> {exData.ice}</div>
+                    <div className="dup-field"><strong>Matches Reg.?:</strong> {exData.match_status}</div>
+                    <div className="dup-field"><strong>Notes:</strong> {exData.notes || '—'}</div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-md mt-lg" style={{ marginTop: 'var(--space-xl)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-md)' }}>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'transparent', color: 'var(--text-primary)', border: '1px solid var(--border)', flex: 1 }}
+                  onClick={() => handleKeepBoth(dup)}
+                >
+                  ➕ Keep Both
+                </button>
+                <button 
+                  className="btn btn-primary btn-sm" 
+                  style={{ flex: 1 }}
+                  onClick={() => handleReplace(dup)}
+                >
+                  🔄 Replace Existing
+                </button>
+                <button
+                  className="btn btn-sm"
+                  style={{ background: 'transparent', color: 'var(--danger)', border: '1px solid rgba(248,113,113,0.3)', flex: 1 }}
+                  onClick={() => handleReject(dup)}
+                >
+                  🚫 Reject Incoming
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

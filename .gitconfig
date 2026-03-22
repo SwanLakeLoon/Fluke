@@ -1,0 +1,7 @@
+[user]
+    name = Swan Lake
+    email = swan.lake.loon@proton.me
+    signingkey = 20B1A3548E80CC5D9306059761C0C7CD018B7CFB
+
+[commit]
+    gpgsign = true
