@@ -76,11 +76,19 @@ export default function UserManager() {
     }
   };
 
-  const handleChangeRole = async (user, nextRole) => {
-    if (user.role === nextRole) return;
-    if (!window.confirm(`Change ${user.username || user.email}'s role from "${user.role || 'user'}" to "${nextRole}"?`)) return;
+  const handleChangeRole = async (targetUser, nextRole) => {
+    if (targetUser.role === nextRole) return;
+    
+    // Prevent admin from demoting themselves
+    const currentUser = pb.authStore.record;
+    if (currentUser?.id === targetUser.id && targetUser.role === 'admin' && nextRole !== 'admin') {
+      alert('You cannot demote yourself. Ask another admin to change your role.');
+      return;
+    }
+    
+    if (!window.confirm(`Change ${targetUser.username || targetUser.email}'s role from "${targetUser.role || 'user'}" to "${nextRole}"?`)) return;
     try {
-      await pb.collection('users').update(user.id, { role: nextRole });
+      await pb.collection('users').update(targetUser.id, { role: nextRole });
       fetchUsers();
     } catch (e) {
       console.error('Role change failed:', e);

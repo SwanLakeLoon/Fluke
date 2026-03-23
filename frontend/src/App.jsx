@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './hooks/useAuth';
+import { useTheme } from './hooks/useTheme';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
 import Search from './pages/Search';
@@ -39,7 +40,6 @@ function ApproverRoute({ children }) {
   return children;
 }
 
-import { useTheme } from './hooks/useTheme';
 
 function AppRoutes() {
   const { user } = useAuth();
