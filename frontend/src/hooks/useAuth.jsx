@@ -36,9 +36,11 @@ export function AuthProvider({ children }) {
   };
 
   const isAdmin = user?.role === 'admin';
+  const isApprover = ['approver', 'admin'].includes(user?.role);
+  const isUploader = ['uploader', 'approver', 'admin'].includes(user?.role);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isApprover, isUploader }}>
       {children}
     </AuthContext.Provider>
   );

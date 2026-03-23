@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { pb } from '../../api/client';
+import { useAuth } from '../../hooks/useAuth';
 import './AdminPages.css';
 
 const COLUMN_MAP = {
@@ -56,12 +57,13 @@ function validateRow(row) {
 }
 
 export default function CsvUpload() {
+  const { user, isAdmin } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
   const [importing, setImporting] = useState(false);
   const [result, setResult] = useState(null);
-  const [priorSightings, setPriorSightings] = useState(null); // map of plate -> sightings[]
+  const [priorSightings, setPriorSightings] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState(new Set());
 
@@ -100,17 +102,38 @@ export default function CsvUpload() {
   const handleImport = async () => {
     setImporting(true);
     const batchName = file.name;
+    const validRows = preview.filter(r => r.errors.length === 0);
+
+    if (!isAdmin) {
+      // --- UPLOADER/APPROVER: Stage for approval ---
+      try {
+        await pb.collection('upload_batches').create({
+          uploaded_by: user.id,
+          filename: batchName,
+          row_count: validRows.length,
+          rows: validRows.map(r => r.mapped),
+          status: 'pending',
+        });
+        setResult({ staged: true, row_count: validRows.length, rejected: preview.length - validRows.length });
+      } catch (e) {
+        console.error('Staging failed:', e);
+        setResult({ staged: true, error: e.message });
+      }
+      setImporting(false);
+      setPreview([]);
+      setValidationErrors([]);
+      setFile(null);
+      return;
+    }
+
+    // --- ADMIN: Direct ingest (existing flow) ---
     let inserted = 0, dupsQueued = 0, rejected = 0;
 
-    // Collect unique valid plates BEFORE importing — so the prior sightings
-    // lookup only sees records that existed before this upload.
-    const batchPlates = [...new Set(preview
-      .filter(r => r.errors.length === 0)
+    const batchPlates = [...new Set(validRows
       .map(r => r.mapped.plate)
       .filter(Boolean)
     )];
 
-    // Snapshot prior sightings before any inserts
     await lookupPriorSightings(batchPlates);
 
     for (const row of preview) {
@@ -140,7 +163,7 @@ export default function CsvUpload() {
             raw_data: record,
             reason: `Duplicate: same plate+date+location (plate=${record.plate})`,
             status: 'pending',
-            import_batch: batchName,
+            import_batch: `${batchName} (by ${user.username || user.email || 'Admin'})`,
             existing_record_id: check.items[0]?.id,
           });
           dupsQueued++;
@@ -294,8 +317,37 @@ export default function CsvUpload() {
           </>
         )}
 
+        {/* 500+ Row Warning */}
+        {preview.length > 500 && (
+          <div className="validation-summary" style={{ background: 'rgba(234, 179, 8, 0.12)', borderColor: 'var(--warning)' }}>
+            <h3>⚠️ Large batch — {preview.length} rows may take a while to process.</h3>
+          </div>
+        )}
+
         {/* Result */}
-        {result && (
+        {result && result.staged ? (
+          <div className="import-result glass-card animate-fadeIn">
+            {result.error ? (
+              <>
+                <h3>❌ Staging Failed</h3>
+                <p style={{ color: 'var(--danger)' }}>{result.error}</p>
+              </>
+            ) : (
+              <>
+                <h3>📤 Staged for Approval</h3>
+                <p style={{ color: 'var(--text-secondary)', marginTop: 'var(--space-sm)' }}>
+                  Your batch of <strong>{result.row_count}</strong> valid rows has been submitted for review.
+                  An approver or admin will review and approve the data before it is ingested into the database.
+                </p>
+                {result.rejected > 0 && (
+                  <p style={{ color: 'var(--danger)', marginTop: 'var(--space-sm)' }}>
+                    {result.rejected} invalid row{result.rejected !== 1 ? 's were' : ' was'} discarded.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : result && (
           <div className="import-result glass-card animate-fadeIn">
             <h3>Import Complete</h3>
             <div className="result-stats">

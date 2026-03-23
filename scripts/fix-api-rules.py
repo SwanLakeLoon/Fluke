@@ -62,29 +62,47 @@ def main():
         else:
             print(f"❌ Failed: {resp.status_code} {resp.json()}")
 
-        # Also update duplicate_queue so admin-role users can manage it
+        # Also update duplicate_queue so admin + approver roles can manage it
         dup_q = next((col for col in items if col["name"] == "duplicate_queue"), None)
         if dup_q:
+            dup_rule = '@request.auth.role = "admin" || @request.auth.role = "approver"'
             resp2 = c.patch(f"{PB_URL}/api/collections/{dup_q['id']}", json={
-                "listRule": '@request.auth.role = "admin"',
-                "viewRule": '@request.auth.role = "admin"',
-                "createRule": '@request.auth.role = "admin"',
-                "updateRule": '@request.auth.role = "admin"',
+                "listRule": dup_rule,
+                "viewRule": dup_rule,
+                "createRule": dup_rule,
+                "updateRule": dup_rule,
                 "deleteRule": '@request.auth.role = "admin"',
             }, headers=headers)
             if resp2.is_success:
-                print("✅ duplicate_queue rules updated (admin-only)")
+                print("✅ duplicate_queue rules updated (admin + approver)")
             else:
                 print(f"❌ duplicate_queue update failed: {resp2.status_code}")
 
-        # Update alpr_records createRule so admin-role users can insert via the UI
+        # Update alpr_records createRule and updateRule so approvers can also insert/update
+        approver_rule = '@request.auth.role = "admin" || @request.auth.role = "approver"'
         resp3 = c.patch(f"{PB_URL}/api/collections/{alpr['id']}", json={
-            "createRule": '@request.auth.role = "admin"',
+            "createRule": approver_rule,
+            "updateRule": approver_rule,
         }, headers=headers)
         if resp3.is_success:
-            print("✅ alpr_records createRule updated (admin-only)")
+            print("✅ alpr_records create/update rules updated (admin + approver)")
         else:
             print(f"❌ createRule update failed: {resp3.status_code}")
+
+        # Fix upload_batches rules
+        ub = next((col for col in items if col["name"] == "upload_batches"), None)
+        if ub:
+            resp_ub = c.patch(f"{PB_URL}/api/collections/{ub['id']}", json={
+                "listRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "viewRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "createRule": '@request.auth.role = "uploader" || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "updateRule": '@request.auth.role = "approver" || @request.auth.role = "admin"',
+                "deleteRule": '@request.auth.role = "admin"',
+            }, headers=headers)
+            if resp_ub.is_success:
+                print("✅ upload_batches rules updated")
+            else:
+                print(f"❌ upload_batches update failed: {resp_ub.status_code}")
 
         # Fix users collection so admin-role users can manage everyone
         users_col = next((col for col in items if col["name"] == "users"), None)

@@ -4,7 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import HelpDrawer from './HelpDrawer';
 
 export default function Navbar() {
-  const { user, logout, isAdmin } = useAuth();
+  const { user, logout, isAdmin, isApprover, isUploader } = useAuth();
   const [helpOpen, setHelpOpen] = useState(false);
 
   if (!user) return null;
@@ -30,20 +30,32 @@ export default function Navbar() {
           >
             Search
           </NavLink>
-          {isAdmin && (
+          {isUploader && (
+            <NavLink
+              to="/upload"
+              className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
+            >
+              Upload CSV
+            </NavLink>
+          )}
+          {isApprover && (
             <>
               <NavLink
-                to="/admin/upload"
+                to="/approval"
                 className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
               >
-                Upload CSV
+                Approval Queue
               </NavLink>
               <NavLink
-                to="/admin/duplicates"
+                to="/duplicates"
                 className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
               >
                 Duplicates
               </NavLink>
+            </>
+          )}
+          {isAdmin && (
+            <>
               <NavLink
                 to="/admin/records"
                 className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}

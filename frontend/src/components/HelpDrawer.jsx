@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 import './HelpDrawer.css';
 
 export default function HelpDrawer({ isOpen, onClose }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, isApprover, isUploader } = useAuth();
 
   useEffect(() => {
     const handleEscape = (e) => {
@@ -57,10 +57,11 @@ export default function HelpDrawer({ isOpen, onClose }) {
             </div>
           </details>
 
-          {isAdmin && (
+          {/* --- UPLOADER FEATURES --- */}
+          {isUploader && (
             <>
               <div className="help-admin-divider">
-                <span>Admin Features</span>
+                <span>{isAdmin ? 'Admin Features' : isApprover ? 'Approver Features' : 'Uploader Features'}</span>
               </div>
 
               <details className="help-section">
@@ -70,7 +71,28 @@ export default function HelpDrawer({ isOpen, onClose }) {
                     <li>Drag & drop or select a <code>.csv</code> file to import new records.</li>
                     <li>The preview table shows whether each row is <strong>Valid</strong> or <strong>Invalid</strong>.</li>
                     <li><strong>Important:</strong> Any row marked as Invalid will be completely discarded and not ingested.</li>
-                    <li>Once imported, the Prior Sightings panel will show you at a glance if plates in your batch have been spotted historically.</li>
+                    {isAdmin ? (
+                      <li>As an admin, records are ingested <strong>directly</strong> into the database. The Prior Sightings panel will show you at a glance if plates in your batch have been spotted historically.</li>
+                    ) : (
+                      <li>Your upload will be <strong>staged for approval</strong>. An admin or approver must review and approve your batch before data enters the database.</li>
+                    )}
+                  </ul>
+                </div>
+              </details>
+            </>
+          )}
+
+          {/* --- APPROVER FEATURES --- */}
+          {isApprover && (
+            <>
+              <details className="help-section">
+                <summary>✅ Approval Queue</summary>
+                <div className="help-section-content">
+                  <ul>
+                    <li>Batches uploaded by non-admin users appear here awaiting review.</li>
+                    <li>Click a batch to see a preview of all rows before deciding.</li>
+                    <li><strong>Approve:</strong> Runs the batch through the ingestion pipeline (with duplicate detection).</li>
+                    <li><strong>Reject:</strong> Discards the entire batch — no records are ingested.</li>
                   </ul>
                 </div>
               </details>
@@ -91,7 +113,12 @@ export default function HelpDrawer({ isOpen, onClose }) {
                   </div>
                 </div>
               </details>
+            </>
+          )}
 
+          {/* --- ADMIN-ONLY FEATURES --- */}
+          {isAdmin && (
+            <>
               <details className="help-section">
                 <summary>📋 Records Manager</summary>
                 <div className="help-section-content">
@@ -107,10 +134,16 @@ export default function HelpDrawer({ isOpen, onClose }) {
                 <summary>👥 User Manager</summary>
                 <div className="help-section-content">
                   <ul>
-                    <li>Create new users using a username, email, and password.</li>
+                    <li>Create new users with a username and password.</li>
                     <li>Reset any user's password if they forget it.</li>
-                    <li>Promote or demote users between <code>user</code> and <code>admin</code> roles.</li>
+                    <li>Assign one of four roles:</li>
                   </ul>
+                  <div className="help-actions-list">
+                    <div><strong>user:</strong> Search only</div>
+                    <div><strong>uploader:</strong> Search + Upload CSV (staged for approval)</div>
+                    <div><strong>approver:</strong> All of uploader + Approval Queue + Duplicate Review</div>
+                    <div><strong>admin:</strong> Full access: direct ingest, approve, records, users</div>
+                  </div>
                 </div>
               </details>
             </>

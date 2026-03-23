@@ -219,6 +219,7 @@ a {
 .badge-danger  { background: var(--danger-dim); color: var(--danger); }
 .badge-muted   { background: rgba(100, 116, 139, 0.2); color: var(--text-muted); }
 .badge-accent  { background: var(--accent-dim); color: var(--accent); }
+.badge-info    { background: rgba(56, 189, 248, 0.15); color: var(--accent); }
 
 /* ===== LAYOUTS ===== */
 .container {

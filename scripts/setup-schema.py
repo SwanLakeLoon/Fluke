@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 PocketBase v0.25 Schema Setup Script
-Creates alpr_records and duplicate_queue collections,
-and adds a role field to the users collection.
+Creates alpr_records, duplicate_queue, and upload_batches collections,
+and adds a role field (user/uploader/approver/admin) to the users collection.
 
 Usage: uv run scripts/setup-schema.py
 """
@@ -62,7 +62,7 @@ def main():
                     {"name": "state",            "type": "text",   "required": True, "max": 2},
                     {"name": "make",             "type": "text",   "max": 50},
                     {"name": "model",            "type": "text",   "max": 50},
-                    {"name": "color",            "type": "select", "values": ["BR", "GR", "BK", "BL", "TN", "SL", "R", "WH"], "maxSelect": 1},
+                    {"name": "color",            "type": "select", "values": ["BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU"], "maxSelect": 1},
                     {"name": "ice",              "type": "select", "values": ["Y", "N", "HS"], "maxSelect": 1},
                     {"name": "match_status",     "type": "select", "values": ["Y", "N"], "maxSelect": 1},
                     {"name": "registration",     "type": "text"},
@@ -95,6 +95,7 @@ def main():
                     {"name": "reason",       "type": "text"},
                     {"name": "status",       "type": "select", "values": ["pending", "approved", "rejected"], "maxSelect": 1},
                     {"name": "import_batch", "type": "text"},
+                    {"name": "existing_record_id", "type": "text"},
                 ],
                 "listRule": None,
                 "viewRule": None,
@@ -104,15 +105,52 @@ def main():
             }, token=token)
             print("✅ duplicate_queue created")
 
-        # 5. Add role field to users
+        # Lookup users collection (needed for upload_batches relation and role update)
         users_col = next((col for col in items if col["name"] == "users"), None)
+
+        # 5. upload_batches
+        if "upload_batches" in names:
+            print("⏭️  upload_batches already exists")
+        else:
+            print("📦 Creating upload_batches...")
+            api(c, "/api/collections", "POST", {
+                "name": "upload_batches",
+                "type": "base",
+                "fields": [
+                    {"name": "uploaded_by", "type": "relation", "required": True, "collectionId": users_col["id"] if users_col else "", "maxSelect": 1, "cascadeDelete": False},
+                    {"name": "filename",    "type": "text", "required": True},
+                    {"name": "row_count",   "type": "number"},
+                    {"name": "rows",        "type": "json"},
+                    {"name": "status",      "type": "select", "values": ["pending", "approved", "rejected"], "maxSelect": 1},
+                ],
+                "listRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "viewRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "createRule": '@request.auth.role = "uploader" || @request.auth.role = "approver" || @request.auth.role = "admin"',
+                "updateRule": '@request.auth.role = "approver" || @request.auth.role = "admin"',
+                "deleteRule": '@request.auth.role = "admin"',
+            }, token=token)
+            print("✅ upload_batches created")
+
+        # 6. Add role field to users (with all four roles)
         if users_col:
             fields = users_col.get("fields", [])
-            if any(f["name"] == "role" for f in fields):
-                print("⏭️  users.role already exists")
+            role_field = next((f for f in fields if f["name"] == "role"), None)
+            if role_field:
+                # Check if it already has all four values
+                existing_values = set(role_field.get("values", []))
+                needed = {"user", "uploader", "approver", "admin"}
+                if needed.issubset(existing_values):
+                    print("⏭️  users.role already has all four roles")
+                else:
+                    print("📦 Updating users.role to include uploader/approver...")
+                    role_field["values"] = list(needed)
+                    api(c, f"/api/collections/{users_col['id']}", "PATCH", {
+                        "fields": fields,
+                    }, token=token)
+                    print("✅ users.role updated with all four roles")
             else:
                 print("📦 Adding role field to users...")
-                fields.append({"name": "role", "type": "select", "values": ["user", "admin"], "maxSelect": 1})
+                fields.append({"name": "role", "type": "select", "values": ["user", "uploader", "approver", "admin"], "maxSelect": 1})
                 api(c, f"/api/collections/{users_col['id']}", "PATCH", {
                     "fields": fields,
                 }, token=token)
@@ -120,8 +158,8 @@ def main():
 
         print("\n🎉 Schema setup complete!\n")
         print("Next steps:")
-        print("  👤 Open http://127.0.0.1:8090/_/ and create a test user")
-        print('  👤 Set the user role to "user" or "admin"')
+        print("  👤 Open PocketBase admin and create a test user")
+        print('  👤 Set the user role to "user", "uploader", "approver", or "admin"')
 
 
 if __name__ == "__main__":

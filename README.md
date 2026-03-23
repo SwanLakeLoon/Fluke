@@ -91,7 +91,6 @@ Once logged into your PocketBase admin panel (`https://your-pod.pikapods.net/_/`
 
 Run these two scripts locally, pointing them at your live pod.
 
-> ⚠️ The env variable is `POCKETBASE_URL` (not `PB_URL`).
 
 ```bash
 # 1. Create collections and add role field to users
@@ -160,7 +159,7 @@ If you forget the env var and deploy first, add it in **Settings → Environment
 
 ### Step 6: Import Data
 
-Upload ALPR `.csv` files using the **CSV Upload** tab in the Fluke admin dashboard, or via CLI:
+Upload ALPR `.csv` files using the **CSV Upload** tab in the Fluke admin dashboard, OR via CLI:
 
 ```bash
 POCKETBASE_URL=https://your-pod.pikapods.net \

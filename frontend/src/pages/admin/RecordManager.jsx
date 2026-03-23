@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { pb } from '../../api/client';
 import './AdminPages.css';
 
-const VALID_COLORS = ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD'];
+const VALID_COLORS = ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU'];
 const VALID_ICE = ['Y', 'N', 'HS'];
 const VALID_MATCH = ['Y', 'N', ''];
 

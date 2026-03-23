@@ -62,12 +62,15 @@ export default function UserManager() {
   };
 
   const handleToggleRole = async (user) => {
-    const newRole = user.role === 'admin' ? 'user' : 'admin';
+    const roles = ['user', 'uploader', 'approver', 'admin'];
+    const currentIdx = roles.indexOf(user.role || 'user');
+    const nextRole = roles[(currentIdx + 1) % roles.length];
+    if (!window.confirm(`Change ${user.username || user.email}'s role from "${user.role || 'user'}" to "${nextRole}"?`)) return;
     try {
-      await pb.collection('users').update(user.id, { role: newRole });
+      await pb.collection('users').update(user.id, { role: nextRole });
       fetchUsers();
     } catch (e) {
-      console.error('Role toggle failed:', e);
+      console.error('Role change failed:', e);
     }
   };
 
@@ -99,12 +102,29 @@ export default function UserManager() {
             />
             <select className="select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
               <option value="user">User</option>
+              <option value="uploader">Uploader</option>
+              <option value="approver">Approver</option>
               <option value="admin">Admin</option>
             </select>
             <button type="submit" className="btn btn-primary" disabled={creating}>
               {creating ? 'Creating...' : 'Create User'}
             </button>
           </form>
+        </div>
+
+        {/* Role Legend */}
+        <div className="glass-card" style={{ marginBottom: 'var(--space-lg)' }}>
+          <h3 style={{ marginBottom: 'var(--space-md)', fontSize: '1rem' }}>Role Permissions</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+            <span className="badge badge-muted" style={{ justifySelf: 'start' }}>user</span>
+            <span>Search only</span>
+            <span className="badge" style={{ justifySelf: 'start', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)' }}>uploader</span>
+            <span>Search + Upload CSV (staged for approval)</span>
+            <span className="badge" style={{ justifySelf: 'start', background: 'rgba(234,179,8,0.15)', color: 'var(--warning)' }}>approver</span>
+            <span>All of uploader + Approval Queue + Duplicate Review</span>
+            <span className="badge badge-accent" style={{ justifySelf: 'start' }}>admin</span>
+            <span>Full access: direct ingest, approve, records, users</span>
+          </div>
         </div>
 
         {/* Users Table */}
@@ -131,7 +151,12 @@ export default function UserManager() {
                     )}
                   </td>
                   <td>
-                    <span className={`badge ${u.role === 'admin' ? 'badge-accent' : 'badge-muted'}`}>
+                    <span className={`badge ${
+                      u.role === 'admin' ? 'badge-accent' 
+                      : u.role === 'approver' ? 'badge-warning'
+                      : u.role === 'uploader' ? 'badge-info'
+                      : 'badge-muted'
+                    }`}>
                       {u.role || 'user'}
                     </span>
                   </td>
@@ -141,7 +166,7 @@ export default function UserManager() {
                         Reset Password
                       </button>
                       <button className="btn btn-ghost btn-sm" onClick={() => handleToggleRole(u)}>
-                        {u.role === 'admin' ? 'Demote' : 'Promote'}
+                        Cycle Role
                       </button>
                     </div>
                   </td>
