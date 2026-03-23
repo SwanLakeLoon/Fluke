@@ -61,10 +61,8 @@ export default function UserManager() {
     }
   };
 
-  const handleToggleRole = async (user) => {
-    const roles = ['user', 'uploader', 'approver', 'admin'];
-    const currentIdx = roles.indexOf(user.role || 'user');
-    const nextRole = roles[(currentIdx + 1) % roles.length];
+  const handleChangeRole = async (user, nextRole) => {
+    if (user.role === nextRole) return;
     if (!window.confirm(`Change ${user.username || user.email}'s role from "${user.role || 'user'}" to "${nextRole}"?`)) return;
     try {
       await pb.collection('users').update(user.id, { role: nextRole });
@@ -165,9 +163,17 @@ export default function UserManager() {
                       <button className="btn btn-ghost btn-sm" onClick={() => handleResetPassword(u.id)}>
                         Reset Password
                       </button>
-                      <button className="btn btn-ghost btn-sm" onClick={() => handleToggleRole(u)}>
-                        Cycle Role
-                      </button>
+                      <select 
+                        className="select select-sm" 
+                        value={u.role || 'user'} 
+                        onChange={(e) => handleChangeRole(u, e.target.value)}
+                        style={{ paddingRight: '24px', fontSize: '0.8rem', background: 'transparent' }}
+                      >
+                        <option value="user">User</option>
+                        <option value="uploader">Uploader</option>
+                        <option value="approver">Approver</option>
+                        <option value="admin">Admin</option>
+                      </select>
                     </div>
                   </td>
                 </tr>

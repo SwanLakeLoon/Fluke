@@ -39,8 +39,11 @@ function ApproverRoute({ children }) {
   return children;
 }
 
+import { useTheme } from './hooks/useTheme';
+
 function AppRoutes() {
   const { user } = useAuth();
+  useTheme(); // Mounts the theme listener so it applies even on Login page
 
   return (
     <>

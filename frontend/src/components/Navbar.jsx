@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { useTheme } from '../hooks/useTheme';
 import HelpDrawer from './HelpDrawer';
 
 export default function Navbar() {
   const { user, logout, isAdmin, isApprover, isUploader } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [helpOpen, setHelpOpen] = useState(false);
 
   if (!user) return null;
@@ -70,6 +72,15 @@ export default function Navbar() {
               </NavLink>
             </>
           )}
+          <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 var(--space-xs)' }}></div>
+          <button 
+            className="btn btn-ghost btn-sm" 
+            onClick={toggleTheme}
+            style={{ padding: '0.4rem', border: 'none', fontSize: '1.2rem', background: 'transparent' }}
+            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
           <button className="btn btn-ghost btn-sm" onClick={logout}>
             Logout
           </button>
