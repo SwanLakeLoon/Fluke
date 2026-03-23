@@ -2,7 +2,7 @@
 
 **Open-source ALPR data explorer** — its just a Fluke!
 
-A web application for searching, importing, and managing ALPR (Automated License Plate Reader) data in the Twin Cities metro area.
+A web application for searching, importing, and managing ALPR (Automated License Plate Reader) data in the Twin Cities metro area (and beyond)!
 
 ## Stack
 
