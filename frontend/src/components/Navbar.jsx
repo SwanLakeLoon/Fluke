@@ -1,18 +1,28 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import HelpDrawer from './HelpDrawer';
 
 export default function Navbar() {
   const { user, logout, isAdmin } = useAuth();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   if (!user) return null;
 
   return (
-    <nav className="navbar">
-      <div className="navbar-content">
-        <div className="navbar-brand" title="Fluke — Open-source ALPR data explorer">
-          Fluke
-        </div>
-        <div className="navbar-links">
+    <>
+      <nav className="navbar">
+        <div className="navbar-content">
+          <button 
+            className="navbar-brand" 
+            title="Open User Guide"
+            onClick={() => setHelpOpen(true)}
+            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            Fluke
+            <span style={{ fontSize: '1rem', opacity: 0.7 }}>❓</span>
+          </button>
+          <div className="navbar-links">
           <NavLink
             to="/"
             className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
@@ -54,5 +64,7 @@ export default function Navbar() {
         </div>
       </div>
     </nav>
+    <HelpDrawer isOpen={helpOpen} onClose={() => setHelpOpen(false)} />
+  </>
   );
 }

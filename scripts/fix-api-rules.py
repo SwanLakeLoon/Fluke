@@ -86,6 +86,26 @@ def main():
         else:
             print(f"❌ createRule update failed: {resp3.status_code}")
 
+        # Fix users collection so admin-role users can manage everyone
+        users_col = next((col for col in items if col["name"] == "users"), None)
+        if users_col:
+            user_rule = 'id = @request.auth.id || @request.auth.role = "admin"'
+            # Auth collections require updating options.manageRule to expose emails to admins
+            opts = users_col.get("options", {})
+            opts["manageRule"] = '@request.auth.role = "admin"'
+
+            resp4 = c.patch(f"{PB_URL}/api/collections/{users_col['id']}", json={
+                "listRule": user_rule,
+                "viewRule": user_rule,
+                "updateRule": user_rule,
+                "deleteRule": user_rule,
+                "options": opts
+            }, headers=headers)
+            if resp4.is_success:
+                print("✅ users collection rules updated (admin-roles can manage all)")
+            else:
+                print(f"❌ users collection update failed: {resp4.status_code}")
+
         print("\n🎉 All API rules fixed!")
 
 
