@@ -223,7 +223,12 @@ export default function CsvUpload() {
   return (
     <div className="page">
       <div className="container">
-        <h1 className="admin-title">CSV Upload</h1>
+        <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-lg)' }}>
+          <h1 className="admin-title" style={{ marginBottom: 0 }}>CSV Upload</h1>
+          <a href="/template.csv" download className="btn btn-ghost btn-sm" aria-label="Download CSV template">
+            📥 Download Template
+          </a>
+        </div>
 
         {/* Drop Zone */}
         <div

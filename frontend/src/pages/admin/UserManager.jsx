@@ -28,18 +28,33 @@ export default function UserManager() {
     e.preventDefault();
     setError('');
     setCreating(true);
+    
+    const isEmail = newUsername.includes('@');
+    const payload = {
+      password: newPassword,
+      passwordConfirm: newPassword,
+      role: newRole,
+    };
+    
+    if (isEmail) {
+      payload.email = newUsername.trim();
+    } else {
+      payload.username = newUsername.trim();
+    }
+
     try {
-      await pb.collection('users').create({
-        username: newUsername,
-        password: newPassword,
-        passwordConfirm: newPassword,
-        role: newRole,
-      });
+      await pb.collection('users').create(payload);
       setNewUsername('');
       setNewPassword('');
       fetchUsers();
     } catch (err) {
-      setError(err?.response?.data?.username?.message || err?.message || 'Failed to create user');
+      // Extract detailed validation errors from PocketBase
+      const pbErrors = err?.data?.data || {};
+      const detailedMessages = Object.entries(pbErrors)
+        .map(([field, errObj]) => `${field}: ${errObj.message}`)
+        .join(' | ');
+      
+      setError(detailedMessages || err?.message || 'Failed to create user');
     }
     setCreating(false);
   };
@@ -84,7 +99,7 @@ export default function UserManager() {
           <form onSubmit={handleCreate} className="user-form">
             <input
               className="input"
-              placeholder="Username"
+              placeholder="Username or Email"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
               required

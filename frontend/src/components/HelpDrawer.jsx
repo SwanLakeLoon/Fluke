@@ -69,6 +69,7 @@ export default function HelpDrawer({ isOpen, onClose }) {
                 <div className="help-section-content">
                   <ul>
                     <li>Drag & drop or select a <code>.csv</code> file to import new records.</li>
+                    <li>Need a template? Download the <a href="/template.csv" download style={{textDecoration: 'underline'}}>example CSV template</a>.</li>
                     <li>The preview table shows whether each row is <strong>Valid</strong> or <strong>Invalid</strong>.</li>
                     <li><strong>Important:</strong> Any row marked as Invalid will be completely discarded and not ingested.</li>
                     {isAdmin ? (
