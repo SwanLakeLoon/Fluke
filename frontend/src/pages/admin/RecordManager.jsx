@@ -394,10 +394,10 @@ export default function RecordManager() {
                     </td>
                     <td>
                       <button
-                        className={`btn btn-sm ${v.sightings[0]?.searchable ? 'btn-primary' : 'btn-ghost'}`}
-                        onClick={() => handleSearchableToggle(v, v.sightings[0]?.searchable)}
+                        className={`btn btn-sm ${v.searchable ? 'btn-primary' : 'btn-ghost'}`}
+                        onClick={() => handleSearchableToggle(v, v.searchable)}
                       >
-                        {v.sightings[0]?.searchable ? '✓ Yes' : '✕ No'}
+                        {v.searchable ? '✓ Yes' : '✕ No'}
                       </button>
                     </td>
                     <td>
