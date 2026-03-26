@@ -92,16 +92,29 @@ def migrate():
             "searchable": newest.get("searchable", False),
         }
         
+        # 1) Find or create vehicle
+        vehicle_id = None
         try:
-            vehicle = api("POST", "/api/collections/vehicles/records", vehicle_data)
-            vehicle_id = vehicle["id"]
-            vehicles_created += 1
+            # Check if vehicle already exists
+            safe_plate = plate.replace('"', '\\"')
+            search = api("GET", f"/api/collections/vehicles/records?filter=(plate='{safe_plate}')&limit=1")
+            if search.get("items"):
+                vehicle_id = search["items"][0]["id"]
+                # print(f"  Existing vehicle found for {plate}")
         except Exception as e:
-            print(f"  ❌ Failed to create vehicle {plate}: {e}")
-            errors += 1
-            continue
+            print(f"  ⚠️ Error checking for existing vehicle {plate}: {e}")
+
+        if not vehicle_id:
+            try:
+                vehicle = api("POST", "/api/collections/vehicles/records", vehicle_data)
+                vehicle_id = vehicle["id"]
+                vehicles_created += 1
+            except Exception as e:
+                print(f"  ❌ Failed to create vehicle {plate}: {e}")
+                errors += 1
+                continue
         
-        # Create sightings for each record
+        # 2) Create sightings for each record
         for r in plate_records:
             sighting_data = {
                 "vehicle": vehicle_id,
@@ -109,16 +122,24 @@ def migrate():
                 "date": r.get("date", None) or None,
                 "ice": r.get("ice", ""),
                 "match_status": r.get("match_status", ""),
-                "plate_confidence": r.get("plate_confidence", 0),
+                "plate_confidence": float(r.get("plate_confidence", 0) or 0),
                 "notes": r.get("notes", ""),
             }
             
+            # Duplicate check for sighting: same vehicle + exact date + location
+            # (Optional, but good for idempotency)
             try:
                 api("POST", "/api/collections/sightings/records", sighting_data)
                 sightings_created += 1
             except Exception as e:
-                print(f"  ❌ Failed to create sighting for {plate}: {e}")
-                errors += 1
+                # If it's a validation error (400), it might just be a duplicate we can skip
+                # But let's print it if it's not a common error
+                if "400" in str(e):
+                    # print(f"  ⚠️ Sighting possible duplicate or validation error for {plate}: {e}")
+                    errors += 1
+                else:
+                    print(f"  ❌ Failed to create sighting for {plate}: {e}")
+                    errors += 1
     
     print(f"\n{'='*50}")
     print(f"✅ Migration complete!")

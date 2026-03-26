@@ -36,7 +36,7 @@ COLUMN_MAP = {
     "Plate Confidence":                           "plate_confidence",
 }
 
-VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU"}
+VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR"}
 VALID_ICE    = {"Y", "N", "HS"}
 VALID_MATCH  = {"Y", "N", ""}
 

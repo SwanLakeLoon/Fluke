@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { pb } from '../../api/client';
+import { processBatch } from '../../utils/ingestPipeline';
 import './AdminPages.css';
 
 export default function ApprovalQueue() {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
+  const [showAllRowsId, setShowAllRowsId] = useState(null);
+  const [removedRows, setRemovedRows] = useState({}); // { [batchId]: Set<index> }
   const [processing, setProcessing] = useState(null); // batch id being processed
   const [approvalResult, setApprovalResult] = useState(null);
 
@@ -14,7 +17,6 @@ export default function ApprovalQueue() {
     try {
       const res = await pb.collection('upload_batches').getList(1, 50, {
         filter: 'status = "pending"',
-        sort: '-created',
         expand: 'uploaded_by',
       });
       setBatches(res.items);
@@ -26,8 +28,42 @@ export default function ApprovalQueue() {
 
   useEffect(() => { fetchBatches(); }, []);
 
+  const handleRemoveRow = async (batch, rowIndex) => {
+    // Remove from local state
+    setRemovedRows(prev => {
+      const next = { ...prev };
+      next[batch.id] = new Set([...(prev[batch.id] || []), rowIndex]);
+      return next;
+    });
+
+    // Persist trimmed rows back to PocketBase
+    const removed = new Set([...(removedRows[batch.id] || []), rowIndex]);
+    const newRows = (batch.rows || []).filter((_, i) => !removed.has(i));
+    try {
+      const updated = await pb.collection('upload_batches').update(batch.id, {
+        rows: newRows,
+        row_count: newRows.length,
+      });
+      // Sync local batch state
+      setBatches(prev => prev.map(b => b.id === batch.id ? { ...b, rows: updated.rows, row_count: updated.row_count } : b));
+      // Clear the removed-set since it's now persisted
+      setRemovedRows(prev => { const next = { ...prev }; delete next[batch.id]; return next; });
+    } catch (e) {
+      console.error('Failed to save row removal:', e);
+      // Revert local state on failure
+      setRemovedRows(prev => {
+        const next = { ...prev };
+        const s = new Set(prev[batch.id] || []);
+        s.delete(rowIndex);
+        next[batch.id] = s;
+        return next;
+      });
+    }
+  };
+
   const handleApprove = async (batch) => {
-    if (!window.confirm(`Approve this batch of ${batch.row_count} rows from "${batch.filename}"?`)) return;
+    const rowCount = batch.rows?.length ?? batch.row_count;
+    if (!window.confirm(`Approve this batch of ${rowCount} rows from "${batch.filename}"?`)) return;
 
     // Double-approval guard: re-fetch to confirm still pending
     try {
@@ -46,95 +82,13 @@ export default function ApprovalQueue() {
     setApprovalResult(null);
 
     const rows = batch.rows || [];
-    let inserted = 0, dupsQueued = 0, errors = 0;
+    const uploaderName = batch.expand?.uploaded_by?.name ||
+      batch.expand?.uploaded_by?.username ||
+      batch.expand?.uploaded_by?.email ||
+      'Unknown';
+    const batchLabel = `${batch.filename} (by ${uploaderName} - Batch ID: ${batch.id})`;
 
-    for (const record of rows) {
-      try {
-        // 1) Find or create the vehicle
-        let vehicle;
-        try {
-          vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${record.plate.replace(/"/g, '\\"')}"`);
-          
-          // Upgrade existing vehicle with new/higher-permission data if missing
-          const updates = {};
-          if (record.searchable && !vehicle.searchable) updates.searchable = true;
-          if (record.vin && !vehicle.vin) updates.vin = record.vin;
-          if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
-          if (record.make && !vehicle.make) updates.make = record.make;
-          if (record.model && !vehicle.model) updates.model = record.model;
-          if (record.color && !vehicle.color) updates.color = record.color;
-          if (record.state && !vehicle.state) updates.state = record.state;
-          if (record.registration && !vehicle.registration) updates.registration = record.registration;
-          
-          if (Object.keys(updates).length > 0) {
-            vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
-          }
-        } catch (e) {
-          vehicle = await pb.collection('vehicles').create({
-            plate: record.plate,
-            state: record.state,
-            make: record.make,
-            model: record.model,
-            color: record.color,
-            registration: record.registration,
-            vin: record.vin,
-            title_issues: record.title_issues,
-            searchable: record.searchable ?? false,
-          });
-        }
-
-        // 2) Duplicate check: same vehicle + location + date
-        const filterParts = [`vehicle = "${vehicle.id}"`];
-        if (record.location) {
-          filterParts.push(`location = "${record.location.replace(/"/g, '\\"')}"`);
-        } else {
-          filterParts.push('location = ""');
-        }
-        const check = await pb.collection('sightings').getList(1, 50, {
-          filter: filterParts.join(' && '),
-        });
-
-        const recDate = record.date ? record.date.substring(0, 10) : null;
-        let isDup = false;
-        let existingSightingId = null;
-        for (const existing of check.items) {
-          const exDate = existing.date ? existing.date.substring(0, 10) : null;
-          if (exDate === recDate) {
-            isDup = true;
-            existingSightingId = existing.id;
-            break;
-          }
-        }
-
-        if (isDup) {
-          const uploaderName = batch.expand?.uploaded_by?.username || batch.expand?.uploaded_by?.email || 'Unknown';
-          await pb.collection('duplicate_queue').create({
-            raw_data: record,
-            reason: `Duplicate: same plate+date+location (plate=${record.plate})`,
-            status: 'pending',
-            import_batch: `${batch.filename} (by ${uploaderName} - Batch ID: ${batch.id})`,
-            existing_record_id: existingSightingId,
-          });
-          dupsQueued++;
-          continue;
-        }
-
-        // 3) Create sighting
-        await pb.collection('sightings').create({
-          vehicle: vehicle.id,
-          location: record.location,
-          date: record.date || null,
-          ice: record.ice,
-          match_status: record.match_status,
-          plate_confidence: record.plate_confidence || 0,
-          notes: record.notes,
-        });
-        inserted++;
-      } catch (e) {
-        console.error('Insert error:', e);
-        errors++;
-      }
-    }
+    const { inserted, dupsQueued, errors } = await processBatch(pb, rows, batchLabel);
 
     // Mark batch as approved
     try {
@@ -215,9 +169,12 @@ export default function ApprovalQueue() {
                 <div className="flex items-center gap-sm" style={{ marginBottom: '4px' }}>
                   <span className="badge badge-warning">Pending</span>
                   <strong style={{ fontSize: '1rem' }}>{batch.filename}</strong>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--primary)', marginLeft: 'var(--space-sm)' }}>
+                    {expandedId === batch.id ? '▼ Hide Preview' : '▶ View Records'}
+                  </span>
                 </div>
                 <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  Uploaded by <strong>{batch.expand?.uploaded_by?.username || batch.expand?.uploaded_by?.email || '—'}</strong> • {formatDate(batch.created)} • {batch.row_count} rows
+                  Uploaded by <strong>{batch.expand?.uploaded_by?.name || batch.expand?.uploaded_by?.username || batch.expand?.uploaded_by?.email || '—'}</strong> • {formatDate(batch.created)} • {batch.row_count} rows
                 </div>
               </div>
               <div className="flex gap-sm" style={{ flexShrink: 0 }}>
@@ -246,6 +203,7 @@ export default function ApprovalQueue() {
                   <table className="data-table">
                     <thead>
                       <tr>
+                      <th></th>
                         <th>#</th>
                         <th>Plate</th>
                         <th>State</th>
@@ -257,8 +215,15 @@ export default function ApprovalQueue() {
                       </tr>
                     </thead>
                     <tbody>
-                      {batch.rows.slice(0, 50).map((row, i) => (
+                      {(showAllRowsId === batch.id ? batch.rows : batch.rows.slice(0, 50)).map((row, i) => (
                         <tr key={i}>
+                            <td>
+                              <button
+                                title="Remove this row from batch"
+                                onClick={(e) => { e.stopPropagation(); handleRemoveRow(batch, batch.rows.indexOf(row)); }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '1rem', padding: '0 4px', lineHeight: 1 }}
+                              >✕</button>
+                            </td>
                           <td>{i + 1}</td>
                           <td><strong>{row.plate}</strong></td>
                           <td>{row.state}</td>
@@ -272,9 +237,15 @@ export default function ApprovalQueue() {
                     </tbody>
                   </table>
                   {batch.rows.length > 50 && (
-                    <p style={{ padding: 'var(--space-sm)', color: 'var(--text-muted)', fontSize: '0.8rem', textAlign: 'center' }}>
-                      Showing first 50 of {batch.rows.length} rows
-                    </p>
+                    <div style={{ textAlign: 'center', padding: 'var(--space-sm)' }}>
+                      {showAllRowsId === batch.id ? (
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowAllRowsId(null)}>Hide expanded rows</button>
+                      ) : (
+                        <button className="btn btn-ghost btn-sm" onClick={() => setShowAllRowsId(batch.id)}>
+                          Show all {batch.rows.length} rows
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>

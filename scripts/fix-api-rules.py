@@ -89,6 +89,17 @@ def main():
         else:
             print(f"❌ createRule update failed: {resp3.status_code}")
 
+        # Update vehicles and sightings create/update rules
+        for c_name in ["vehicles", "sightings"]:
+            c_col = next((col for col in items if col["name"] == c_name), None)
+            if c_col:
+                c_resp = c.patch(f"{PB_URL}/api/collections/{c_col['id']}", json={
+                    "createRule": approver_rule,
+                    "updateRule": approver_rule,
+                    "deleteRule": '@request.auth.role = "admin"'
+                }, headers=headers)
+                print(f"{'✅' if c_resp.is_success else '❌'} {c_name} rules updated")
+
         # Fix upload_batches rules
         ub = next((col for col in items if col["name"] == "upload_batches"), None)
         if ub:

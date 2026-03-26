@@ -62,7 +62,7 @@ def main():
                     {"name": "state",            "type": "text",   "required": True, "max": 2},
                     {"name": "make",             "type": "text",   "max": 50},
                     {"name": "model",            "type": "text",   "max": 50},
-                    {"name": "color",            "type": "select", "values": ["BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU"], "maxSelect": 1},
+                    {"name": "color",            "type": "select", "values": ["BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR"], "maxSelect": 1},
                     {"name": "ice",              "type": "select", "values": ["Y", "N", "HS"], "maxSelect": 1},
                     {"name": "match_status",     "type": "select", "values": ["Y", "N"], "maxSelect": 1},
                     {"name": "registration",     "type": "text"},

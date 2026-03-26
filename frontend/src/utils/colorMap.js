@@ -13,6 +13,7 @@ export const COLOR_MAP = {
   GN: { name: 'Green',  hex: '#22C55E' },
   GD: { name: 'Gold',   hex: '#EAB308' },
   PU: { name: 'Purple', hex: '#A855F7' },
+  OR: { name: 'Orange', hex: '#F97316' },
 };
 
 export function getColorInfo(abbr) {

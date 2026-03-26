@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Papa from 'papaparse';
 import { pb } from '../../api/client';
+import { processBatch } from '../../utils/ingestPipeline';
 import { useAuth } from '../../hooks/useAuth';
 import './AdminPages.css';
 
@@ -21,7 +22,7 @@ const COLUMN_MAP = {
   'Plate Confidence': 'plate_confidence',
 };
 
-const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU']);
+const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR']);
 const VALID_ICE = new Set(['Y', 'N', 'HS']);
 const VALID_MATCH = new Set(['Y', 'N', '']);
 
@@ -61,7 +62,7 @@ function validateRow(row) {
 }
 
 export default function CsvUpload() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isApprover } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState([]);
   const [validationErrors, setValidationErrors] = useState([]);
@@ -70,6 +71,13 @@ export default function CsvUpload() {
   const [priorSightings, setPriorSightings] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState(new Set());
+  const [showAllPreview, setShowAllPreview] = useState(false);
+
+  const handleRemovePreviewRow = (index) => {
+    const next = preview.filter(r => r.index !== index);
+    setPreview(next);
+    setValidationErrors(next.filter(r => r.errors.length > 0));
+  };
 
   const handleFile = (f) => {
     if (!f) return;
@@ -108,7 +116,7 @@ export default function CsvUpload() {
     const batchName = file.name;
     const validRows = preview.filter(r => r.errors.length === 0);
 
-    if (!isAdmin) {
+    if (!isAdmin && !isApprover) {
       // --- UPLOADER/APPROVER: Stage for approval ---
       try {
         await pb.collection('upload_batches').create({
@@ -130,111 +138,9 @@ export default function CsvUpload() {
       return;
     }
 
-    // --- ADMIN: Direct ingest (existing flow) ---
-    let inserted = 0, dupsQueued = 0, rejected = 0;
-
-    const batchPlates = [...new Set(validRows
-      .map(r => r.mapped.plate)
-      .filter(Boolean)
-    )];
-
-    await lookupPriorSightings(batchPlates);
-
-    for (const row of preview) {
-      if (row.errors.length > 0) { rejected++; continue; }
-
-      const record = row.mapped;
-
-      try {
-        // 1) Find or create the vehicle
-        let vehicle;
-        try {
-          const vRes = await pb.collection('vehicles').getFirstListItem(`plate = "${record.plate.replace(/"/g, '\\"')}"`);
-          vehicle = vRes;
-          
-          // Upgrade existing vehicle with new/higher-permission data if missing
-          const updates = {};
-          if (record.searchable && !vehicle.searchable) updates.searchable = true;
-          if (record.vin && !vehicle.vin) updates.vin = record.vin;
-          if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
-          if (record.make && !vehicle.make) updates.make = record.make;
-          if (record.model && !vehicle.model) updates.model = record.model;
-          if (record.color && !vehicle.color) updates.color = record.color;
-          if (record.state && !vehicle.state) updates.state = record.state;
-          if (record.registration && !vehicle.registration) updates.registration = record.registration;
-          
-          if (Object.keys(updates).length > 0) {
-            vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
-          }
-        } catch (e) {
-          // Not found — create it
-          vehicle = await pb.collection('vehicles').create({
-            plate: record.plate,
-            state: record.state,
-            make: record.make,
-            model: record.model,
-            color: record.color,
-            registration: record.registration,
-            vin: record.vin,
-            title_issues: record.title_issues,
-            searchable: record.searchable,
-          });
-        }
-
-        // 2) Duplicate check: same vehicle + location + date
-        const filterParts = [`vehicle = "${vehicle.id}"`];
-        if (record.location) {
-          filterParts.push(`location = "${record.location.replace(/"/g, '\\"')}"`);
-        } else {
-          filterParts.push('location = ""');
-        }
-
-        const check = await pb.collection('sightings').getList(1, 50, {
-          filter: filterParts.join(' && '),
-        });
-
-        // Match date in JS to avoid PocketBase date="" parsing errors
-        const recDate = record.date ? record.date.substring(0, 10) : null;
-        let isDup = false;
-        let existingSightingId = null;
-
-        for (const existing of check.items) {
-          const exDate = existing.date ? existing.date.substring(0, 10) : null;
-          if (exDate === recDate) {
-            isDup = true;
-            existingSightingId = existing.id;
-            break;
-          }
-        }
-
-        if (isDup) {
-          await pb.collection('duplicate_queue').create({
-            raw_data: record,
-            reason: `Duplicate: same plate+date+location (plate=${record.plate})`,
-            status: 'pending',
-            import_batch: `${batchName} (by ${user.username || user.email || 'Admin'})`,
-            existing_record_id: existingSightingId,
-          });
-          dupsQueued++;
-          continue;
-        }
-
-        // 3) Create sighting
-        await pb.collection('sightings').create({
-          vehicle: vehicle.id,
-          location: record.location,
-          date: record.date || null,
-          ice: record.ice,
-          match_status: record.match_status,
-          plate_confidence: record.plate_confidence,
-          notes: record.notes,
-        });
-        inserted++;
-      } catch (e) {
-        console.error('Insert error:', e);
-        rejected++;
-      }
-    }
+    const batchLabel = `${batchName} (by ${user.name || user.username || user.email || 'Admin'})`;
+    const { inserted, dupsQueued, errors: rejectedCount } = await processBatch(pb, validRows.map(r => r.mapped), batchLabel);
+    const rejected = preview.filter(r => r.errors.length > 0).length + rejectedCount;
 
     setResult({ inserted, dupsQueued, rejected });
     setImporting(false);
@@ -351,6 +257,7 @@ export default function CsvUpload() {
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>#</th>
                     <th>Status</th>
                     <th>Plate</th>
@@ -363,8 +270,16 @@ export default function CsvUpload() {
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.slice(0, 50).map(r => (
+                  {(showAllPreview ? preview : preview.slice(0, 50)).map(r => (
                     <tr key={r.index} className={r.errors.length > 0 ? 'row-error' : ''}>
+                      <td>
+                        <button
+                          title="Remove this row"
+                          onClick={() => handleRemovePreviewRow(r.index)}
+                          disabled={importing}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '1rem', padding: '0 4px', lineHeight: 1 }}
+                        >✕</button>
+                      </td>
                       <td>{r.index}</td>
                       <td>
                         {r.errors.length > 0
@@ -383,6 +298,17 @@ export default function CsvUpload() {
                 </tbody>
               </table>
             </div>
+            {preview.length > 50 && (
+              <div style={{ textAlign: 'center', padding: 'var(--space-sm)' }}>
+                {showAllPreview ? (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAllPreview(false)}>Hide expanded rows</button>
+                ) : (
+                  <button className="btn btn-ghost btn-sm" onClick={() => setShowAllPreview(true)}>
+                    Show all {preview.length} rows
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 

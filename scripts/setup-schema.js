@@ -57,7 +57,7 @@ async function main() {
         { name: 'state',            type: 'text',   required: true, options: { maxLength: 2 } },
         { name: 'make',             type: 'text',   options: { maxLength: 50 } },
         { name: 'model',            type: 'text',   options: { maxLength: 50 } },
-        { name: 'color',            type: 'select', options: { values: ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH'] } },
+        { name: 'color',            type: 'select', options: { values: ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'OR'] } },
         { name: 'ice',              type: 'select', options: { values: ['Y', 'N', 'HS'] } },
         { name: 'match',            type: 'select', options: { values: ['Y', 'N', ''] } },
         { name: 'registration',     type: 'text' },
