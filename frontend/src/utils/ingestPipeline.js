@@ -142,11 +142,18 @@ export async function ingestRecord(pb, record, batchLabel) {
  */
 export async function processBatch(pb, records, batchLabel) {
   let inserted = 0, dupsQueued = 0, errors = 0;
+  let firstError = null;
   for (const record of records) {
-    const { result } = await ingestRecord(pb, record, batchLabel);
+    const { result, error } = await ingestRecord(pb, record, batchLabel);
     if (result === 'inserted') inserted++;
     else if (result === 'duplicate') dupsQueued++;
-    else errors++;
+    else {
+      errors++;
+      if (!firstError && error) {
+        firstError = error;
+        console.error('[ingestPipeline] First error (plate=%s):', record.plate, error?.message, error);
+      }
+    }
   }
-  return { inserted, dupsQueued, errors };
+  return { inserted, dupsQueued, errors, firstError };
 }

@@ -12,9 +12,26 @@ export default function DuplicateReview() {
       const res = await pb.collection('duplicate_queue').getList(1, 50, {
         filter: 'status = "pending"',
         sort: 'status',
-        expand: 'existing_record_id,existing_record_id.vehicle',
       });
-      setDupes(res.items);
+
+      // existing_record_id is a plain text field (sighting ID) — fetch each manually
+      const enriched = await Promise.all(res.items.map(async (dup) => {
+        if (!dup.existing_record_id) return dup;
+        try {
+          const sighting = await pb.collection('sightings').getOne(dup.existing_record_id, {
+            expand: 'vehicle',
+          });
+          return {
+            ...dup,
+            _existingSighting: sighting,
+            _existingVehicle: sighting.expand?.vehicle || null,
+          };
+        } catch {
+          return dup; // sighting may have been deleted
+        }
+      }));
+
+      setDupes(enriched);
     } catch (e) {
       console.error('Failed to fetch duplicates:', e);
     }
@@ -150,10 +167,9 @@ export default function DuplicateReview() {
 
         {dupes.map(dup => {
           const incData = dup.raw_data || {};
-          // exData is the expanded sighting; exVehicle is the vehicle associated with it
-          const exSighting = dup.expand?.existing_record_id || null;
-          const exVehicle = exSighting?.expand?.vehicle || null;
-          // Combined view for displaying the existing record (sighting fields + vehicle fields)
+          // Use manual fetches stored on the dup object
+          const exSighting = dup._existingSighting || null;
+          const exVehicle = dup._existingVehicle || null;
           const exData = exSighting && exVehicle ? { ...exVehicle, ...exSighting } : null;
           
           return (
