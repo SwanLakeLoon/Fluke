@@ -12,7 +12,7 @@ export default function DuplicateReview() {
       const res = await pb.collection('duplicate_queue').getList(1, 50, {
         filter: 'status = "pending"',
         sort: 'status',
-        expand: 'existing_record_id',
+        expand: 'existing_record_id,existing_record_id.vehicle',
       });
       setDupes(res.items);
     } catch (e) {
@@ -26,7 +26,21 @@ export default function DuplicateReview() {
   const handleKeepBoth = async (dup) => {
     if (!window.confirm("Insert the incoming record as a completely new entry?")) return;
     try {
-      await pb.collection('alpr_records').create(dup.raw_data);
+      let vehicle;
+      try {
+        vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${dup.raw_data.plate}"`);
+      } catch (e) {
+        vehicle = await pb.collection('vehicles').create({
+          plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
+          model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
+          vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues, searchable: dup.raw_data.searchable ?? false,
+        });
+      }
+      await pb.collection('sightings').create({
+        vehicle: vehicle.id, location: dup.raw_data.location, date: dup.raw_data.date || null,
+        ice: dup.raw_data.ice, match_status: dup.raw_data.match_status, plate_confidence: dup.raw_data.plate_confidence || 0,
+        notes: dup.raw_data.notes,
+      });
       await pb.collection('duplicate_queue').update(dup.id, { status: 'approved' });
       setDupes(prev => prev.filter(d => d.id !== dup.id));
     } catch (e) {
@@ -39,9 +53,34 @@ export default function DuplicateReview() {
     if (!window.confirm("Overwrite the existing database record with the incoming data?")) return;
     try {
       if (dup.existing_record_id) {
-        await pb.collection('alpr_records').update(dup.existing_record_id, dup.raw_data);
+        // Fetch FIRST to get vehicle FK, then write
+        const existingSighting = await pb.collection('sightings').getOne(dup.existing_record_id);
+        await pb.collection('sightings').update(dup.existing_record_id, {
+          location: dup.raw_data.location, date: dup.raw_data.date || null,
+          ice: dup.raw_data.ice, match_status: dup.raw_data.match_status,
+          plate_confidence: dup.raw_data.plate_confidence || 0, notes: dup.raw_data.notes,
+        });
+        await pb.collection('vehicles').update(existingSighting.vehicle, {
+          state: dup.raw_data.state, make: dup.raw_data.make, model: dup.raw_data.model, 
+          color: dup.raw_data.color, registration: dup.raw_data.registration,
+          vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues,
+        });
       } else {
-        await pb.collection('alpr_records').create(dup.raw_data);
+        let vehicle;
+        try {
+          vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${dup.raw_data.plate}"`);
+        } catch (e) {
+          vehicle = await pb.collection('vehicles').create({
+            plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
+            model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
+            vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues, searchable: dup.raw_data.searchable ?? false,
+          });
+        }
+        await pb.collection('sightings').create({
+          vehicle: vehicle.id, location: dup.raw_data.location, date: dup.raw_data.date || null,
+          ice: dup.raw_data.ice, match_status: dup.raw_data.match_status, plate_confidence: dup.raw_data.plate_confidence || 0,
+          notes: dup.raw_data.notes,
+        });
       }
       await pb.collection('duplicate_queue').update(dup.id, { status: 'approved' });
       setDupes(prev => prev.filter(d => d.id !== dup.id));
@@ -111,7 +150,11 @@ export default function DuplicateReview() {
 
         {dupes.map(dup => {
           const incData = dup.raw_data || {};
-          const exData = dup.expand?.existing_record_id || null;
+          // exData is the expanded sighting; exVehicle is the vehicle associated with it
+          const exSighting = dup.expand?.existing_record_id || null;
+          const exVehicle = exSighting?.expand?.vehicle || null;
+          // Combined view for displaying the existing record (sighting fields + vehicle fields)
+          const exData = exSighting && exVehicle ? { ...exVehicle, ...exSighting } : null;
           
           return (
             <div key={dup.id} className="dup-card glass-card animate-fadeIn">

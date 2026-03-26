@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { pb } from '../api/client';
-import { groupBySightings } from '../utils/groupSightings';
 import VehicleCard from '../components/VehicleCard';
 import './Search.css';
 
@@ -9,7 +8,7 @@ const DEBOUNCE_MS = 300;
 
 export default function Search() {
   const [filters, setFilters] = useState({
-    plate: '', state: '', ice: '', match_status: '', vin: '', location: '',
+    plate: '', state: '', ice: '', match_status: '', vin: '', location: '', sightings: '',
   });
   const [vehicles, setVehicles] = useState([]);
   const [page, setPage] = useState(1);
@@ -21,20 +20,21 @@ export default function Search() {
 
   // Fetch total searchable count for hero
   useEffect(() => {
-    pb.collection('alpr_records').getList(1, 1, { filter: 'searchable = true' })
+    pb.collection('vehicles').getList(1, 1, { filter: 'searchable = true' })
       .then(res => setHeroCount(res.totalItems))
       .catch(() => setHeroCount(0));
   }, []);
 
-  // Build filter string
+  // Build filter string for enhanced_plate_stats view
   const buildFilter = useCallback(() => {
     const parts = ['searchable = true'];
     if (filters.plate)        parts.push(`plate ~ "${filters.plate}"`);
-    if (filters.state)         parts.push(`state = "${filters.state}"`);
-    if (filters.ice)           parts.push(`ice = "${filters.ice}"`);
-    if (filters.match_status)  parts.push(`match_status = "${filters.match_status}"`);
-    if (filters.vin)           parts.push(`vin ~ "${filters.vin}"`);
-    if (filters.location)      parts.push(`location ~ "${filters.location}"`);
+    if (filters.state)         parts.push(`state_list ~ "${filters.state}"`);
+    if (filters.ice)           parts.push(`ice_list ~ "${filters.ice}"`);
+    if (filters.match_status)  parts.push(`match_status_list ~ "${filters.match_status}"`);
+    if (filters.vin)           parts.push(`vin_list ~ "${filters.vin}"`);
+    if (filters.location)      parts.push(`location_list ~ "${filters.location}"`);
+    if (filters.sightings)     parts.push(`sighting_count >= ${filters.sightings}`);
     return parts.join(' && ');
   }, [filters]);
 
@@ -53,13 +53,36 @@ export default function Search() {
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await pb.collection('alpr_records').getList(page, PER_PAGE, {
+        // Query the plate_stats view first to paginate by unique plate
+        const res = await pb.collection('enhanced_plate_stats').getList(page, PER_PAGE, {
           filter: buildFilter(),
-          sort: '-plate',
+          sort: '-latest_sighting',
         });
         setTotalItems(res.totalItems);
         setTotalPages(res.totalPages);
-        setVehicles(groupBySightings(res.items));
+
+        if (res.items.length === 0) {
+          setVehicles([]);
+        } else {
+          const vehicleIds = res.items.map(s => s.id);
+          const vehFilterStr = vehicleIds.map(id => `id = "${id}"`).join(' || ');
+          const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr });
+          
+          const sightFilterStr = vehicleIds.map(id => `vehicle = "${id}"`).join(' || ');
+          const sightRes = await pb.collection('sightings').getFullList({ filter: sightFilterStr, sort: '-date' });
+
+          const vmap = new Map();
+          for (const v of vehRes) {
+            vmap.set(v.id, { ...v, sightings: [] });
+          }
+          for (const s of sightRes) {
+            if (vmap.has(s.vehicle)) vmap.get(s.vehicle).sightings.push(s);
+          }
+
+          // Sort grouped records to match the paginated stats view order
+          const grouped = res.items.map(s => vmap.get(s.id)).filter(Boolean);
+          setVehicles(grouped);
+        }
       } catch (err) {
         console.error('Search error:', err);
         setVehicles([]);
@@ -141,6 +164,17 @@ export default function Search() {
               value={filters.location}
               onChange={(e) => updateFilter('location', e.target.value)}
             />
+            <select
+              className="select"
+              value={filters.sightings}
+              onChange={(e) => updateFilter('sightings', e.target.value)}
+            >
+              <option value="">Sightings — All</option>
+              <option value="2">2+ Sightings</option>
+              <option value="3">3+ Sightings</option>
+              <option value="4">4+ Sightings</option>
+              <option value="5">5+ Sightings</option>
+            </select>
           </div>
         </div>
 

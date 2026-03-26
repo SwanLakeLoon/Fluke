@@ -39,6 +39,10 @@ function mapRow(csvRow) {
   }
   // plate_confidence
   mapped.plate_confidence = parseFloat(mapped.plate_confidence) || 0;
+  // Fallback for plural "Dates" column
+  if (!mapped.date) {
+    mapped.date = (csvRow['Dates'] || '').trim();
+  }
   // blank date → null
   if (!mapped.date) mapped.date = null;
   return mapped;
@@ -141,41 +145,90 @@ export default function CsvUpload() {
 
       const record = row.mapped;
 
-      // Duplicate check
       try {
-        const filterParts = [`plate = "${record.plate}"`];
-        if (record.date) {
-          filterParts.push(`date = "${record.date}"`);
-        } else {
-          filterParts.push('date = ""');
+        // 1) Find or create the vehicle
+        let vehicle;
+        try {
+          const vRes = await pb.collection('vehicles').getFirstListItem(`plate = "${record.plate.replace(/"/g, '\\"')}"`);
+          vehicle = vRes;
+          
+          // Upgrade existing vehicle with new/higher-permission data if missing
+          const updates = {};
+          if (record.searchable && !vehicle.searchable) updates.searchable = true;
+          if (record.vin && !vehicle.vin) updates.vin = record.vin;
+          if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
+          if (record.make && !vehicle.make) updates.make = record.make;
+          if (record.model && !vehicle.model) updates.model = record.model;
+          if (record.color && !vehicle.color) updates.color = record.color;
+          if (record.state && !vehicle.state) updates.state = record.state;
+          if (record.registration && !vehicle.registration) updates.registration = record.registration;
+          
+          if (Object.keys(updates).length > 0) {
+            vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+          }
+        } catch (e) {
+          // Not found — create it
+          vehicle = await pb.collection('vehicles').create({
+            plate: record.plate,
+            state: record.state,
+            make: record.make,
+            model: record.model,
+            color: record.color,
+            registration: record.registration,
+            vin: record.vin,
+            title_issues: record.title_issues,
+            searchable: record.searchable,
+          });
         }
+
+        // 2) Duplicate check: same vehicle + location + date
+        const filterParts = [`vehicle = "${vehicle.id}"`];
         if (record.location) {
-          filterParts.push(`location = "${record.location}"`);
+          filterParts.push(`location = "${record.location.replace(/"/g, '\\"')}"`);
         } else {
           filterParts.push('location = ""');
         }
-        const check = await pb.collection('alpr_records').getList(1, 1, {
+
+        const check = await pb.collection('sightings').getList(1, 50, {
           filter: filterParts.join(' && '),
         });
 
-        if (check.totalItems > 0) {
+        // Match date in JS to avoid PocketBase date="" parsing errors
+        const recDate = record.date ? record.date.substring(0, 10) : null;
+        let isDup = false;
+        let existingSightingId = null;
+
+        for (const existing of check.items) {
+          const exDate = existing.date ? existing.date.substring(0, 10) : null;
+          if (exDate === recDate) {
+            isDup = true;
+            existingSightingId = existing.id;
+            break;
+          }
+        }
+
+        if (isDup) {
           await pb.collection('duplicate_queue').create({
             raw_data: record,
             reason: `Duplicate: same plate+date+location (plate=${record.plate})`,
             status: 'pending',
             import_batch: `${batchName} (by ${user.username || user.email || 'Admin'})`,
-            existing_record_id: check.items[0]?.id,
+            existing_record_id: existingSightingId,
           });
           dupsQueued++;
           continue;
         }
-      } catch (e) {
-        console.error('Dup check error:', e);
-      }
 
-      // Insert
-      try {
-        await pb.collection('alpr_records').create(record);
+        // 3) Create sighting
+        await pb.collection('sightings').create({
+          vehicle: vehicle.id,
+          location: record.location,
+          date: record.date || null,
+          ice: record.ice,
+          match_status: record.match_status,
+          plate_confidence: record.plate_confidence,
+          notes: record.notes,
+        });
         inserted++;
       } catch (e) {
         console.error('Insert error:', e);
@@ -193,17 +246,26 @@ export default function CsvUpload() {
   const lookupPriorSightings = async (plates) => {
     if (!plates.length) { setPriorSightings({}); return; }
     try {
-      // Build OR filter: plate = "A" || plate = "B" || ...
-      const filterStr = plates.map(p => `plate = "${p}"`).join(' || ');
-      const res = await pb.collection('alpr_records').getFullList({
+      const filterStr = plates.map(p => `plate = "${p.replace(/"/g, '\\"')}"`).join(' || ');
+      const vehicleRes = await pb.collection('vehicles').getFullList({
         filter: filterStr,
+      });
+      const vehicleIds = vehicleRes.map(v => v.id);
+      if (vehicleIds.length === 0) { setPriorSightings({}); return; }
+
+      const sightFilter = vehicleIds.map(id => `vehicle = "${id}"`).join(' || ');
+      const sightRes = await pb.collection('sightings').getFullList({
+        filter: sightFilter,
         sort: '-date',
+        expand: 'vehicle',
       });
       // Group by plate
       const grouped = {};
-      for (const r of res) {
-        if (!grouped[r.plate]) grouped[r.plate] = [];
-        grouped[r.plate].push(r);
+      for (const s of sightRes) {
+        const plate = s.expand?.vehicle?.plate;
+        if (!plate) continue;
+        if (!grouped[plate]) grouped[plate] = [];
+        grouped[plate].push(s);
       }
       setPriorSightings(grouped);
     } catch (e) {
@@ -293,6 +355,7 @@ export default function CsvUpload() {
                     <th>Status</th>
                     <th>Plate</th>
                     <th>State</th>
+                    <th>Date</th>
                     <th>Make</th>
                     <th>Model</th>
                     <th>ICE</th>
@@ -310,6 +373,7 @@ export default function CsvUpload() {
                       </td>
                       <td>{r.mapped.plate}</td>
                       <td>{r.mapped.state}</td>
+                      <td>{r.mapped.date ? new Date(r.mapped.date).toLocaleDateString() : '—'}</td>
                       <td>{r.mapped.make}</td>
                       <td>{r.mapped.model}</td>
                       <td>{r.mapped.ice}</td>
