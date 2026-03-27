@@ -14,20 +14,53 @@ export default function DuplicateReview() {
         sort: 'status',
       });
 
-      // existing_record_id is a plain text field (sighting ID) — fetch each manually
       const enriched = await Promise.all(res.items.map(async (dup) => {
-        if (!dup.existing_record_id) return dup;
         try {
-          const sighting = await pb.collection('sightings').getOne(dup.existing_record_id, {
+          let existingSightingId = dup.existing_record_id;
+
+          // ── Fallback: if no existing_record_id, find the matching sighting
+          //    by plate+location (handles old records from pre-normalized schema)
+          if (!existingSightingId && dup.raw_data?.plate) {
+            try {
+              const vRes = await pb.collection('vehicles').getList(1, 1, {
+                filter: `plate = "${dup.raw_data.plate.replace(/"/g, '\\"')}"`,
+                fields: 'id',
+              });
+              if (vRes.items.length > 0) {
+                const vid = vRes.items[0].id;
+                const loc = dup.raw_data.location || '';
+                const sRes = await pb.collection('sightings').getList(1, 1, {
+                  filter: `vehicle = "${vid}" && location = "${loc.replace(/"/g, '\\"')}"`,
+                  sort: '-date',
+                  fields: 'id',
+                });
+                if (sRes.items.length > 0) existingSightingId = sRes.items[0].id;
+              }
+            } catch { /* ignore — best effort */ }
+          }
+
+          if (!existingSightingId) return dup;
+
+          // ── Fetch the sighting with vehicle expand ────────────────────────
+          const sighting = await pb.collection('sightings').getOne(existingSightingId, {
             expand: 'vehicle',
           });
+
+          // ── If expand.vehicle is null, fetch the vehicle directly ─────────
+          let vehicle = sighting.expand?.vehicle || null;
+          if (!vehicle && sighting.vehicle) {
+            try {
+              vehicle = await pb.collection('vehicles').getOne(sighting.vehicle);
+            } catch { /* vehicle may have been deleted */ }
+          }
+
           return {
             ...dup,
             _existingSighting: sighting,
-            _existingVehicle: sighting.expand?.vehicle || null,
+            _existingVehicle: vehicle,
           };
         } catch {
-          return dup; // sighting may have been deleted
+          return dup; // sighting may have been deleted — show incoming side only
         }
       }));
 
@@ -170,7 +203,9 @@ export default function DuplicateReview() {
           // Use manual fetches stored on the dup object
           const exSighting = dup._existingSighting || null;
           const exVehicle = dup._existingVehicle || null;
-          const exData = exSighting && exVehicle ? { ...exVehicle, ...exSighting } : null;
+          // Show right panel as long as we have the sighting.
+          // Vehicle data is optional — spread empty object if unavailable.
+          const exData = exSighting ? { ...(exVehicle || {}), ...exSighting } : null;
           
           return (
             <div key={dup.id} className="dup-card glass-card animate-fadeIn">
