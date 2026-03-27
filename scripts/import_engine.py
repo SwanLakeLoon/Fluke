@@ -62,13 +62,11 @@ def validate_row(row: dict) -> list[str]:
     errors = []
     if not row.get("plate"):
         errors.append("plate is required")
-    elif len(row["plate"]) > 10:
-        errors.append(f"plate too long ({len(row['plate'])} > 10)")
+    elif len(row["plate"]) > 20:
+        errors.append(f"plate too long ({len(row['plate'])} > 20)")
 
-    if not row.get("state"):
-        errors.append("state is required")
-    elif len(row["state"]) != 2:
-        errors.append(f"state must be 2 chars, got '{row['state']}'")
+    if row.get("state") and len(row["state"]) > 2:
+        errors.append(f"state must be at most 2 chars, got '{row['state']}'")
 
     if row.get("color") and row["color"] not in VALID_COLORS:
         errors.append(f"invalid color '{row['color']}', must be one of {VALID_COLORS}")

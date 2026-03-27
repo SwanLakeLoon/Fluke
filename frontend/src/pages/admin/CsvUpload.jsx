@@ -52,9 +52,8 @@ function mapRow(csvRow) {
 function validateRow(row) {
   const errors = [];
   if (!row.plate) errors.push('plate required');
-  else if (row.plate.length > 10) errors.push('plate too long');
-  if (!row.state) errors.push('state required');
-  else if (row.state.length !== 2) errors.push('state must be 2 chars');
+  else if (row.plate.length > 20) errors.push('plate too long');
+  if (row.state && row.state.length > 2) errors.push('state must be at most 2 chars');
   if (row.color && !VALID_COLORS.has(row.color)) errors.push(`invalid color: ${row.color}`);
   if (row.ice && !VALID_ICE.has(row.ice)) errors.push(`invalid ICE: ${row.ice}`);
   if (row.match_status && !VALID_MATCH.has(row.match_status)) errors.push(`invalid match: ${row.match_status}`);

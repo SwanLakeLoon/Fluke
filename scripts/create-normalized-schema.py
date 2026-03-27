@@ -70,8 +70,8 @@ def main():
                     "CREATE UNIQUE INDEX idx_vehicles_plate ON vehicles (plate)"
                 ],
                 "fields": [
-                    {"id": "textvehicleplate", "name": "plate",         "type": "text",   "required": True,  "max": 10,  "min": 0, "presentable": True},
-                    {"id": "textvehiclestate", "name": "state",         "type": "text",   "required": True,  "max": 2,   "min": 0},
+                    {"id": "textvehicleplate", "name": "plate",         "type": "text",   "required": True,  "max": 20,  "min": 0, "presentable": True},
+                    {"id": "textvehiclestate", "name": "state",         "type": "text",   "required": False, "max": 2,   "min": 0},
                     {"id": "textvehiclemake",  "name": "make",          "type": "text",   "required": False, "max": 50,  "min": 0},
                     {"id": "textvehiclemodel", "name": "model",         "type": "text",   "required": False, "max": 50,  "min": 0},
                     {"id": "textvehiclecolor", "name": "color",         "type": "text",   "required": False, "max": 10,  "min": 0},
@@ -156,7 +156,32 @@ def main():
             }, token)
             print("✅ Created enhanced_plate_stats view")
 
-        # ── 5. API rules (vehicles + sightings) ───────────────────────────
+        # ── 5. ice_change_log ─────────────────────────────────────────────
+        if collection_exists(client, token, "ice_change_log"):
+            print("⏭  ice_change_log collection already exists — skipping")
+        else:
+            api(client, "/api/collections", "POST", {
+                "id": "pbcicechangelog",
+                "name": "ice_change_log",
+                "type": "base",
+                "listRule": "@request.auth.id != \"\"",
+                "viewRule":  "@request.auth.id != \"\"",
+                "createRule": None,
+                "updateRule": None,
+                "deleteRule": None,
+                "fields": [
+                    {"id": "texticclplate",    "name": "plate",             "type": "text",   "required": True,  "max": 10,  "min": 0, "presentable": True},
+                    {"id": "texticcloldice",   "name": "old_ice",           "type": "text",   "required": False, "max": 5,   "min": 0},
+                    {"id": "texticclnewice",   "name": "new_ice",           "type": "text",   "required": False, "max": 5,   "min": 0},
+                    {"id": "numicclvehupd",    "name": "vehicles_updated",  "type": "number", "required": False},
+                    {"id": "numicclsighupd",   "name": "sightings_updated", "type": "number", "required": False},
+                    {"id": "dateicclrundate",  "name": "run_date",          "type": "date",   "required": False},
+                    {"id": "boolicclack",      "name": "acknowledged",      "type": "bool",   "required": False},
+                ],
+            }, token)
+            print("✅ Created ice_change_log collection")
+
+        # ── 6. API rules (vehicles + sightings) ───────────────────────────
         print("\n🔧 Applying API rules for vehicles and sightings...")
         for col_name in ["vehicles", "sightings"]:
             try:
