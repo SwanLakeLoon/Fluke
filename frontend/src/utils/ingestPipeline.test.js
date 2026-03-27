@@ -272,22 +272,34 @@ describe('processBatch', () => {
 
     const pb = makePb();
 
-    // record2: vehicle exists with all fields, sighting exists → dup
-    pb._mocks.vehicles.getFirstListItem
-      .mockRejectedValueOnce(new Error('not found')) // record1
-      .mockResolvedValueOnce({ id: 'v2', plate: 'BBB002', make: 'Ford', model: 'F150', state: 'TX', color: 'BK', searchable: true }) // record2
-      .mockRejectedValueOnce(new Error('not found')); // record3
+    // Phase 1 vehicle lookup: dispatch by plate value (safe for concurrent Promise.all)
+    pb._mocks.vehicles.getFirstListItem.mockImplementation((filter) => {
+      if (filter.includes('BBB002')) {
+        return Promise.resolve({
+          id: 'v2', plate: 'BBB002', make: 'Ford', model: 'F150',
+          state: 'TX', color: 'BK', searchable: true,
+        });
+      }
+      return Promise.reject(new Error('not found')); // AAA001 and CCC003
+    });
 
-    pb._mocks.vehicles.create
-      .mockResolvedValueOnce({ id: 'v1' }) // record1
-      .mockRejectedValueOnce(new Error('403 Forbidden')); // record3
+    // Phase 2 vehicle creation: dispatch by plate value
+    pb._mocks.vehicles.create.mockImplementation((data) => {
+      if (data.plate === 'CCC003') return Promise.reject(new Error('403 Forbidden'));
+      return Promise.resolve({ id: 'v1', plate: data.plate }); // AAA001
+    });
 
-    pb._mocks.sightings.getList
-      .mockResolvedValueOnce({ items: [] }) // record1 — no dup
-      .mockResolvedValueOnce({ items: [{ id: 's_old', date: '2024-01-02T08:00:00Z' }] }); // record2 — dup
+    // Sighting dup checks: dispatch by vehicleId
+    pb._mocks.sightings.getList.mockImplementation((page, size, opts) => {
+      if (opts?.filter?.includes('v2')) {
+        // BBB002 vehicle → dup
+        return Promise.resolve({ items: [{ id: 's_old', date: '2024-01-02T08:00:00Z' }] });
+      }
+      return Promise.resolve({ items: [] }); // AAA001 → not dup
+    });
 
-    pb._mocks.sightings.create.mockResolvedValueOnce({ id: 'new-sighting' }); // record1
-    pb._mocks.duplicate_queue.create.mockResolvedValueOnce({}); // record2
+    pb._mocks.sightings.create.mockResolvedValue({ id: 'new-sighting' });
+    pb._mocks.duplicate_queue.create.mockResolvedValue({});
 
     const counts = await processBatch(pb, [record1, record2, record3], 'test-batch');
 

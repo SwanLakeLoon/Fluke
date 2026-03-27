@@ -135,25 +135,122 @@ export async function ingestRecord(pb, record, batchLabel) {
 /**
  * Process an array of records and return aggregate counts.
  *
+ * Optimized strategy:
+ *   Phase 1 — build a vehicle cache: deduplicate all plates first so the same
+ *              plate is only fetched/created ONCE even if it appears 20 times.
+ *   Phase 2 — write sightings concurrently in chunks of CONCURRENCY (default 8).
+ *
+ * This reduces API round-trips dramatically versus the old serial for-await loop.
+ *
  * @param {object} pb
- * @param {Array} records
+ * @param {Array}  records
  * @param {string} batchLabel
- * @returns {{ inserted: number, dupsQueued: number, errors: number }}
+ * @param {number} [concurrency=8]
+ * @returns {{ inserted: number, dupsQueued: number, errors: number, firstError: Error|null }}
  */
-export async function processBatch(pb, records, batchLabel) {
+export async function processBatch(pb, records, batchLabel, concurrency = 8) {
+  // ── Phase 1: build vehicle cache (one lookup per unique plate) ────────────
+  const uniquePlates = [...new Set(records.map(r => r.plate).filter(Boolean))];
+  const vehicleCache = new Map(); // plate → vehicle record
+
+  await Promise.all(
+    uniquePlates.map(async (plate) => {
+      try {
+        const v = await pb
+          .collection('vehicles')
+          .getFirstListItem(`plate = "${plate.replace(/"/g, '\\"')}"`);
+        vehicleCache.set(plate, v);
+      } catch {
+        vehicleCache.set(plate, null); // null = needs creation
+      }
+    })
+  );
+
+  // ── Phase 2: process sightings concurrently in chunks ────────────────────
   let inserted = 0, dupsQueued = 0, errors = 0;
   let firstError = null;
-  for (const record of records) {
-    const { result, error } = await ingestRecord(pb, record, batchLabel);
-    if (result === 'inserted') inserted++;
-    else if (result === 'duplicate') dupsQueued++;
-    else {
-      errors++;
-      if (!firstError && error) {
-        firstError = error;
-        console.error('[ingestPipeline] First error (plate=%s):', record.plate, error?.message, error);
+
+  for (let i = 0; i < records.length; i += concurrency) {
+    const chunk = records.slice(i, i + concurrency);
+
+    const results = await Promise.all(
+      chunk.map(record => ingestRecordCached(pb, record, batchLabel, vehicleCache))
+    );
+
+    for (const { result, error } of results) {
+      if (result === 'inserted') inserted++;
+      else if (result === 'duplicate') dupsQueued++;
+      else {
+        errors++;
+        if (!firstError && error) {
+          firstError = error;
+          console.error('[ingestPipeline] First error (plate=%s):', error?.plate, error?.message, error);
+        }
       }
     }
   }
+
   return { inserted, dupsQueued, errors, firstError };
+}
+
+/**
+ * Internal: process one record using the pre-built vehicle cache.
+ * Creates the vehicle on first miss, then updates the cache.
+ */
+async function ingestRecordCached(pb, record, batchLabel, vehicleCache) {
+  try {
+    let vehicle = vehicleCache.get(record.plate);
+
+    if (vehicle === null) {
+      // First occurrence of this plate in this batch — create it
+      vehicle = await pb.collection('vehicles').create({
+        plate:        record.plate,
+        state:        record.state,
+        make:         record.make,
+        model:        record.model,
+        color:        record.color,
+        registration: record.registration,
+        vin:          record.vin,
+        title_issues: record.title_issues,
+        searchable:   record.searchable ?? false,
+      });
+      vehicleCache.set(record.plate, vehicle); // update cache for subsequent rows
+    } else if (vehicle) {
+      // Backfill any missing fields
+      const updates = {};
+      if (record.searchable && !vehicle.searchable) updates.searchable = true;
+      if (record.vin          && !vehicle.vin)          updates.vin = record.vin;
+      if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
+      if (record.make         && !vehicle.make)         updates.make = record.make;
+      if (record.model        && !vehicle.model)        updates.model = record.model;
+      if (record.color        && !vehicle.color)        updates.color = record.color;
+      if (record.state        && !vehicle.state)        updates.state = record.state;
+      if (record.registration && !vehicle.registration) updates.registration = record.registration;
+      if (Object.keys(updates).length > 0) {
+        vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+        vehicleCache.set(record.plate, vehicle);
+      }
+    }
+
+    const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
+
+    if (isDup) {
+      await logDuplicate(pb, record, existingSightingId, batchLabel);
+      return { result: 'duplicate' };
+    }
+
+    await pb.collection('sightings').create({
+      vehicle:          vehicle.id,
+      location:         record.location,
+      date:             record.date || null,
+      ice:              record.ice,
+      match_status:     record.match_status,
+      plate_confidence: record.plate_confidence || 0,
+      notes:            record.notes,
+    });
+
+    return { result: 'inserted' };
+  } catch (err) {
+    return { result: 'error', error: err };
+  }
 }
