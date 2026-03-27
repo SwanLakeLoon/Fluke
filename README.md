@@ -176,3 +176,48 @@ Every `git push` to `main` will automatically trigger a new Vercel deploy. No ac
 
 For PocketBase schema changes, re-run `setup-schema.py` and `fix-api-rules.py` against the production pod URL.
 
+---
+
+## 🔄 Nightly ICE Status Refresh (GitHub Actions)
+
+Fluke runs a nightly job that re-checks every known plate against the `defrostmn.net` database and updates any vehicles whose ICE status has changed. When an admin next logs in, a banner shows which plates changed.
+
+### How it works
+
+1. GitHub Actions triggers at **4:00 AM CST** (`0 10 * * *` UTC) every night
+2. `scripts/ice_refresh.py` fetches all plates from PocketBase
+3. Each plate is checked against `defrostmn.net/plates/lookup`
+4. Changed plates → all sightings updated, vehicle `searchable` flag updated, change logged to `ice_change_log`
+5. On next admin login → dismissible notification banner
+
+### One-time Setup (Human — do once)
+
+Add these four secrets to **GitHub → your repo → Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret name | Value |
+|---|---|
+| `POCKETBASE_URL` | `https://your-pod.pikapods.net` |
+| `PB_ADMIN_EMAIL` | Your PocketBase superuser email |
+| `PB_ADMIN_PASS` | Your PocketBase superuser password |
+| `DEFROST_PASSWORD` | The defrost API shared password |
+
+### Triggering Manually
+
+Go to **GitHub → Actions → Nightly ICE Refresh → Run workflow** to trigger a manual run and verify the output before relying on the schedule.
+
+### Adjusting the schedule
+
+Edit `.github/workflows/ice-refresh.yml` and change the cron expression:
+
+```yaml
+- cron: '0 10 * * *'   # 4:00 AM CST — adjust as needed
+```
+
+[Cron expression reference](https://crontab.guru)
+
+### Monitoring
+
+Every run (success or failure) is logged in **GitHub → Actions → Nightly ICE Refresh**. The output shows:
+- How many plates were checked
+- How many changed
+- Any errors or skipped plates
