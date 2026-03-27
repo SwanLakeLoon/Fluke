@@ -29,6 +29,8 @@ export default function RecordManager() {
       case 'location': return 'location_list';
       case '-searchable': return '-searchable';
       case 'searchable': return 'searchable';
+      case '-sightings': return '-sighting_count';
+      case 'sightings': return 'sighting_count';
       default: return sb; // plate, -plate
     }
   };
@@ -261,6 +263,8 @@ export default function RecordManager() {
             >
               <option value="-date">Sighting Date (Newest)</option>
               <option value="date">Sighting Date (Oldest)</option>
+              <option value="-sightings">Sightings (Most)</option>
+              <option value="sightings">Sightings (Least)</option>
               <option value="plate">Plate (A-Z)</option>
               <option value="-plate">Plate (Z-A)</option>
               <option value="location">Location (A-Z)</option>
