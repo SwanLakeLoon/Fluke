@@ -222,10 +222,6 @@ export default function DuplicateReview() {
                 {/* INCOMING RECORD — LEFT */}
                 <div className="dup-side" style={{ borderRight: exData ? '1px solid var(--border)' : 'none', paddingRight: exData ? 'var(--space-xl)' : 0 }}>
                   <h4 style={{ color: 'var(--accent)' }}>Incoming CSV Record</h4>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 'var(--space-md)' }}>
-                    {dup.reason}
-                  </p>
-
                   <MatchField label="Plate"    value={incData.plate} />
                   <DiffField  label="State"    incoming={incData.state}        existing={exData?.state} />
                   <DiffField  label="Make/Model" incoming={incData.make ? `${incData.make} ${incData.model}` : incData.model} existing={exData ? `${exData.make} ${exData.model}` : null} />

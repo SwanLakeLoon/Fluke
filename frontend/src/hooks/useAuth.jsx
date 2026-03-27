@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { pb } from '../api/client';
+import { deriveRoles } from './authUtils';
 
 const AuthContext = createContext(null);
 
@@ -35,9 +36,7 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const isAdmin = user?.role === 'admin';
-  const isApprover = ['approver', 'admin'].includes(user?.role);
-  const isUploader = ['uploader', 'approver', 'admin'].includes(user?.role);
+  const { isAdmin, isApprover, isUploader } = deriveRoles(user);
 
   return (
     <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isApprover, isUploader }}>
