@@ -46,6 +46,7 @@ function makePb({ vehicles = {}, sightings = {}, duplicate_queue = {}, vins = {}
       ...vins,
     },
     sightings: {
+      getFullList: vi.fn().mockResolvedValue([]),
       getList: vi.fn(),
       create: vi.fn(),
       ...sightings,

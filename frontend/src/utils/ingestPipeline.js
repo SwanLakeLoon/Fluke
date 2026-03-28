@@ -250,6 +250,39 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
     }
   }
 
+  // ── Phase 2.5: build sighting cache (single batch fetch) ──────────────────
+  // Pre-fetch ALL existing sightings for the known vehicles in one query
+  // instead of doing N individual getList calls per record.
+  // Key format: "vehicleId|YYYY-MM-DD|location" → sighting id
+  const sightingCache = new Map();
+
+  const validVehicleIds = [...vehicleCache.values()]
+    .filter(v => v && !(v instanceof Error))
+    .map(v => v.id);
+
+  if (validVehicleIds.length > 0) {
+    try {
+      // Fetch in batches of 30 vehicle IDs to avoid overly long filter strings
+      const VEHICLE_BATCH_SIZE = 30;
+      for (let vi = 0; vi < validVehicleIds.length; vi += VEHICLE_BATCH_SIZE) {
+        const vIdBatch = validVehicleIds.slice(vi, vi + VEHICLE_BATCH_SIZE);
+        const sightFilter = vIdBatch.map(id => `vehicle = "${id}"`).join(' || ');
+        const existingSightings = await pb.collection('sightings').getFullList({
+          filter: sightFilter,
+          fields: 'id,vehicle,date,location',
+        });
+        for (const s of existingSightings) {
+          const dateStr = s.date ? s.date.substring(0, 10) : '';
+          const key = `${s.vehicle}|${dateStr}|${s.location || ''}`;
+          sightingCache.set(key, s.id);
+        }
+      }
+    } catch (err) {
+      console.warn('[ingestPipeline] Sighting cache pre-fetch failed, falling back to per-record checks:', err);
+      // sightingCache stays empty — ingestRecordCached will fall back to individual queries
+    }
+  }
+
   // ── Phase 3: process sightings concurrently in chunks ────────────────────
   let inserted = 0, dupsQueued = 0, errors = 0;
   let firstError = null;
@@ -263,7 +296,8 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
 
     const results = await Promise.all(
       chunk.map(async record => {
-        const sightingKey = `${record.plate}|${(record.date || '').substring(0, 10)}|${record.location || ''}`;
+        const dateStr = (record.date || '').substring(0, 10);
+        const sightingKey = `${record.plate}|${dateStr}|${record.location || ''}`;
         
         // Immediate internal duplicate check
         if (inBatchSightings.has(sightingKey)) {
@@ -272,7 +306,7 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
         }
         
         inBatchSightings.add(sightingKey);
-        return ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache);
+        return ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache, sightingCache);
       })
     );
 
@@ -296,7 +330,7 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
  * Internal: process one record using the pre-built caches.
  * Caches are fully populated by this point.
  */
-async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache) {
+async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache, sightingCache) {
   try {
     // ── VIN backfill phase ─────────────────────────────────────────────────
     let vinRelationId = null;
@@ -330,8 +364,24 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
       }
     }
 
-    // ── Sighting phase ─────────────────────────────────────────────────────
-    const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
+    // ── Sighting phase (cache-first, fallback to DB query) ─────────────────
+    const dateStr = record.date ? record.date.substring(0, 10) : '';
+    const cacheKey = `${vehicle.id}|${dateStr}|${record.location || ''}`;
+
+    let isDup = false;
+    let existingSightingId = null;
+
+    if (sightingCache.has(cacheKey)) {
+      // Cache hit — known duplicate
+      isDup = true;
+      existingSightingId = sightingCache.get(cacheKey);
+    } else if (sightingCache.size === 0) {
+      // Cache empty (pre-fetch failed or no existing vehicles) — fall back to per-record query
+      const dbResult = await findDuplicateSighting(pb, vehicle.id, record);
+      isDup = dbResult.isDup;
+      existingSightingId = dbResult.existingSightingId;
+    }
+    // If cache is populated and key is absent → not a dup (no DB call needed)
 
     if (isDup) {
       await logDuplicate(pb, record, existingSightingId, batchLabel);
