@@ -4,7 +4,39 @@
  * Shared ingest logic for both CsvUpload and ApprovalQueue.
  * Accepts a PocketBase client (pb) as a parameter so it can be
  * easily swapped for a mock in tests.
+ *
+ * 3-tier architecture: VIN → Vehicle → Sighting
  */
+
+/**
+ * Find an existing VIN record, or create a new one.
+ *
+ * @param {object} pb - PocketBase SDK client
+ * @param {string} vin - The VIN string
+ * @param {string} titleIssues - Title issues text
+ * @returns {object|null} VIN record, or null if no vin provided
+ */
+export async function findOrCreateVin(pb, vin, titleIssues) {
+  if (!vin) return null;
+
+  try {
+    const existing = await pb
+      .collection('vins')
+      .getFirstListItem(`vin = "${vin.replace(/"/g, '\\"')}"`);
+
+    // Backfill title_issues if missing
+    if (titleIssues && !existing.title_issues) {
+      return await pb.collection('vins').update(existing.id, { title_issues: titleIssues });
+    }
+    return existing;
+  } catch {
+    // Not found — create
+    return await pb.collection('vins').create({
+      vin,
+      title_issues: titleIssues || '',
+    });
+  }
+}
 
 /**
  * Find an existing vehicle by plate, or create a new one.
@@ -13,9 +45,10 @@
  *
  * @param {object} pb - PocketBase SDK client
  * @param {object} record - Mapped row data
+ * @param {string|null} vinRelationId - ID of the VIN record (or null)
  * @returns {object} vehicle record
  */
-export async function findOrCreateVehicle(pb, record) {
+export async function findOrCreateVehicle(pb, record, vinRelationId) {
   let vehicle;
   try {
     vehicle = await pb
@@ -25,12 +58,11 @@ export async function findOrCreateVehicle(pb, record) {
     // Backfill missing fields
     const updates = {};
     if (record.searchable && !vehicle.searchable) updates.searchable = true;
-    if (record.vin && !vehicle.vin) updates.vin = record.vin;
-    if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
-    if (record.make && !vehicle.make) updates.make = record.make;
-    if (record.model && !vehicle.model) updates.model = record.model;
-    if (record.color && !vehicle.color) updates.color = record.color;
-    if (record.state && !vehicle.state) updates.state = record.state;
+    if (vinRelationId && !vehicle.vin_relation)    updates.vin_relation = vinRelationId;
+    if (record.make         && !vehicle.make)         updates.make = record.make;
+    if (record.model        && !vehicle.model)        updates.model = record.model;
+    if (record.color        && !vehicle.color)        updates.color = record.color;
+    if (record.state        && !vehicle.state)        updates.state = record.state;
     if (record.registration && !vehicle.registration) updates.registration = record.registration;
 
     if (Object.keys(updates).length > 0) {
@@ -45,8 +77,7 @@ export async function findOrCreateVehicle(pb, record) {
       model: record.model,
       color: record.color,
       registration: record.registration,
-      vin: record.vin,
-      title_issues: record.title_issues,
+      vin_relation: vinRelationId || '',
       searchable: record.searchable ?? false,
     });
   }
@@ -99,7 +130,7 @@ export async function logDuplicate(pb, record, sightingId, batchLabel) {
 }
 
 /**
- * Process a single record through the full ingest pipeline.
+ * Process a single record through the full 3-tier ingest pipeline.
  *
  * @param {object} pb - PocketBase client
  * @param {object} record - Mapped row data
@@ -108,7 +139,14 @@ export async function logDuplicate(pb, record, sightingId, batchLabel) {
  */
 export async function ingestRecord(pb, record, batchLabel) {
   try {
-    const vehicle = await findOrCreateVehicle(pb, record);
+    // Phase 1: VIN
+    const vinRecord = await findOrCreateVin(pb, record.vin, record.title_issues);
+    const vinRelationId = vinRecord ? vinRecord.id : null;
+
+    // Phase 2: Vehicle
+    const vehicle = await findOrCreateVehicle(pb, record, vinRelationId);
+
+    // Phase 3: Sighting
     const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
 
     if (isDup) {
@@ -132,24 +170,40 @@ export async function ingestRecord(pb, record, batchLabel) {
   }
 }
 
-/**
- * Process an array of records and return aggregate counts.
- *
- * Optimized strategy:
- *   Phase 1 — build a vehicle cache: deduplicate all plates first so the same
- *              plate is only fetched/created ONCE even if it appears 20 times.
- *   Phase 2 — write sightings concurrently in chunks of CONCURRENCY (default 8).
- *
- * This reduces API round-trips dramatically versus the old serial for-await loop.
- *
- * @param {object} pb
- * @param {Array}  records
- * @param {string} batchLabel
- * @param {number} [concurrency=8]
- * @returns {{ inserted: number, dupsQueued: number, errors: number, firstError: Error|null }}
- */
 export async function processBatch(pb, records, batchLabel, concurrency = 8) {
-  // ── Phase 1: build vehicle cache (one lookup per unique plate) ────────────
+  // ── Phase 1: build VIN cache ─────────────────────────────────────────────
+  const uniqueVins = [...new Set(records.map(r => r.vin).filter(Boolean))];
+  const vinCache = new Map(); // vin string → vin record
+
+  await Promise.all(
+    uniqueVins.map(async (vin) => {
+      try {
+        const v = await pb
+          .collection('vins')
+          .getFirstListItem(`vin = "${vin.replace(/"/g, '\\"')}"`);
+        vinCache.set(vin, v);
+      } catch {
+        vinCache.set(vin, null); // null = needs creation
+      }
+    })
+  );
+
+  for (const vin of uniqueVins) {
+    if (vinCache.get(vin) === null) {
+      try {
+        const firstRec = records.find(r => r.vin === vin);
+        const newVin = await pb.collection('vins').create({
+          vin,
+          title_issues: firstRec.title_issues || '',
+        });
+        vinCache.set(vin, newVin);
+      } catch (err) {
+        vinCache.set(vin, err);
+      }
+    }
+  }
+
+  // ── Phase 2: build vehicle cache ─────────────────────────────────────────
   const uniquePlates = [...new Set(records.map(r => r.plate).filter(Boolean))];
   const vehicleCache = new Map(); // plate → vehicle record
 
@@ -166,7 +220,35 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
     })
   );
 
-  // ── Phase 2: process sightings concurrently in chunks ────────────────────
+  for (const plate of uniquePlates) {
+    if (vehicleCache.get(plate) === null) {
+      try {
+        const firstRec = records.find(r => r.plate === plate);
+        let vinRelationId = null;
+        if (firstRec.vin) {
+          const vinEntry = vinCache.get(firstRec.vin);
+          if (vinEntry instanceof Error) throw vinEntry;
+          vinRelationId = vinEntry?.id || null;
+        }
+        
+        const newVeh = await pb.collection('vehicles').create({
+          plate:        firstRec.plate,
+          state:        firstRec.state,
+          make:         firstRec.make,
+          model:        firstRec.model,
+          color:        firstRec.color,
+          registration: firstRec.registration,
+          vin_relation: vinRelationId || '',
+          searchable:   firstRec.searchable ?? false,
+        });
+        vehicleCache.set(plate, newVeh);
+      } catch (err) {
+        vehicleCache.set(plate, err);
+      }
+    }
+  }
+
+  // ── Phase 3: process sightings concurrently in chunks ────────────────────
   let inserted = 0, dupsQueued = 0, errors = 0;
   let firstError = null;
 
@@ -174,7 +256,7 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
     const chunk = records.slice(i, i + concurrency);
 
     const results = await Promise.all(
-      chunk.map(record => ingestRecordCached(pb, record, batchLabel, vehicleCache))
+      chunk.map(record => ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache))
     );
 
     for (const { result, error } of results) {
@@ -194,44 +276,44 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
 }
 
 /**
- * Internal: process one record using the pre-built vehicle cache.
- * Creates the vehicle on first miss, then updates the cache.
+ * Internal: process one record using the pre-built caches.
+ * Caches are fully populated by this point.
  */
-async function ingestRecordCached(pb, record, batchLabel, vehicleCache) {
+async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache) {
   try {
-    let vehicle = vehicleCache.get(record.plate);
+    // ── VIN backfill phase ─────────────────────────────────────────────────
+    let vinRelationId = null;
+    if (record.vin) {
+      let vinRec = vinCache.get(record.vin);
+      if (vinRec instanceof Error) throw vinRec;
+      if (vinRec && record.title_issues && !vinRec.title_issues) {
+        vinRec = await pb.collection('vins').update(vinRec.id, { title_issues: record.title_issues });
+        vinCache.set(record.vin, vinRec);
+      }
+      vinRelationId = vinRec.id;
+    }
 
-    if (vehicle === null) {
-      // First occurrence of this plate in this batch — create it
-      vehicle = await pb.collection('vehicles').create({
-        plate:        record.plate,
-        state:        record.state,
-        make:         record.make,
-        model:        record.model,
-        color:        record.color,
-        registration: record.registration,
-        vin:          record.vin,
-        title_issues: record.title_issues,
-        searchable:   record.searchable ?? false,
-      });
-      vehicleCache.set(record.plate, vehicle); // update cache for subsequent rows
-    } else if (vehicle) {
-      // Backfill any missing fields
+    // ── Vehicle backfill phase ─────────────────────────────────────────────
+    let vehicle = vehicleCache.get(record.plate);
+    if (vehicle instanceof Error) throw vehicle;
+    if (vehicle) {
       const updates = {};
-      if (record.searchable && !vehicle.searchable) updates.searchable = true;
-      if (record.vin          && !vehicle.vin)          updates.vin = record.vin;
-      if (record.title_issues && !vehicle.title_issues) updates.title_issues = record.title_issues;
-      if (record.make         && !vehicle.make)         updates.make = record.make;
-      if (record.model        && !vehicle.model)        updates.model = record.model;
-      if (record.color        && !vehicle.color)        updates.color = record.color;
-      if (record.state        && !vehicle.state)        updates.state = record.state;
-      if (record.registration && !vehicle.registration) updates.registration = record.registration;
+      if (record.searchable   && !vehicle.searchable)    updates.searchable = true;
+      if (vinRelationId       && !vehicle.vin_relation)   updates.vin_relation = vinRelationId;
+      if (record.make         && !vehicle.make)           updates.make = record.make;
+      if (record.model        && !vehicle.model)          updates.model = record.model;
+      if (record.color        && !vehicle.color)          updates.color = record.color;
+      if (record.state        && !vehicle.state)          updates.state = record.state;
+      if (record.registration && !vehicle.registration)   updates.registration = record.registration;
+      
       if (Object.keys(updates).length > 0) {
-        vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+        const updatedVehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+        if (updatedVehicle) vehicle = updatedVehicle;
         vehicleCache.set(record.plate, vehicle);
       }
     }
 
+    // ── Sighting phase ─────────────────────────────────────────────────────
     const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
 
     if (isDup) {

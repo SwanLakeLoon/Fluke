@@ -7,6 +7,10 @@ export default function VehicleCard({ vehicle }) {
   const colorInfo = getColorInfo(vehicle.color);
   const regNotFound = !vehicle.registration || vehicle.registration.toLowerCase().includes('not found');
 
+  // Resolve VIN from expanded relation or fallback to direct fields
+  const vinDisplay = vehicle._vin || vehicle.expand?.vin_relation?.vin || vehicle.vin || '';
+  const titleIssuesDisplay = vehicle._title_issues || vehicle.expand?.vin_relation?.title_issues || vehicle.title_issues || '';
+
   return (
     <div className="vehicle-card glass-card animate-fadeIn">
       {/* Identity Block */}
@@ -28,10 +32,10 @@ export default function VehicleCard({ vehicle }) {
               {colorInfo.name}
             </span>
           </div>
-          {vehicle.vin && (
+          {vinDisplay && (
             <div className="vc-detail">
               <span className="vc-label">VIN</span>
-              <span className="vc-value vc-vin">{vehicle.vin}</span>
+              <span className="vc-value vc-vin">{vinDisplay}</span>
             </div>
           )}
           <div className="vc-detail">
@@ -42,10 +46,10 @@ export default function VehicleCard({ vehicle }) {
               <span className="vc-value">{vehicle.registration}</span>
             )}
           </div>
-          {vehicle.title_issues && (
+          {titleIssuesDisplay && (
             <div className="vc-detail">
               <span className="vc-label">Title Issues</span>
-              <span className="vc-value vc-title-issues">{vehicle.title_issues}</span>
+              <span className="vc-value vc-title-issues">{titleIssuesDisplay}</span>
             </div>
           )}
         </div>

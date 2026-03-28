@@ -206,7 +206,7 @@ export default function Search() {
 
             <div className="search-results">
               {vehicles.map(v => (
-                <VehicleCard key={v.plate} vehicle={v} />
+                <VehicleCard key={v.id} vehicle={v} />
               ))}
             </div>
 

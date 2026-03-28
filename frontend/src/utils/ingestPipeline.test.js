@@ -30,13 +30,19 @@ import {
 // ---------------------------------------------------------------------------
 
 /** Creates a minimal mock pb.collection() factory. */
-function makePb({ vehicles = {}, sightings = {}, duplicate_queue = {} } = {}) {
+function makePb({ vehicles = {}, sightings = {}, duplicate_queue = {}, vins = {} } = {}) {
   const colMocks = {
     vehicles: {
       getFirstListItem: vi.fn(),
       update: vi.fn(),
       create: vi.fn(),
       ...vehicles,
+    },
+    vins: {
+      getFirstListItem: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn(),
+      ...vins,
     },
     sightings: {
       getList: vi.fn(),
@@ -257,6 +263,25 @@ describe('ingestRecord', () => {
 
     expect(result).toBe('error');
     expect(error.message).toBe('403 Forbidden');
+  });
+
+  it('provides a VIN relation when record contains VIN', async () => {
+    const pb = makePb();
+    // Simulate VIN not found, so it creates one
+    pb._mocks.vins.getFirstListItem.mockRejectedValue(new Error('not found'));
+    pb._mocks.vins.create.mockResolvedValue({ id: 'vin123' });
+    
+    pb._mocks.vehicles.getFirstListItem.mockRejectedValue(new Error('not found'));
+    pb._mocks.vehicles.create.mockResolvedValue({ id: 'v1' });
+    pb._mocks.sightings.getList.mockResolvedValue({ items: [] });
+    pb._mocks.sightings.create.mockResolvedValue({ id: 's1' });
+
+    const { result } = await ingestRecord(pb, { ...baseRecord, vin: 'TESTVIN', title_issues: 'Salvage' }, 'batch-label');
+
+    expect(result).toBe('inserted');
+    expect(pb._mocks.vins.create).toHaveBeenCalledOnce();
+    expect(pb._mocks.vins.create).toHaveBeenCalledWith(expect.objectContaining({ vin: 'TESTVIN', title_issues: 'Salvage' }));
+    expect(pb._mocks.vehicles.create).toHaveBeenCalledWith(expect.objectContaining({ vin_relation: 'vin123' }));
   });
 });
 

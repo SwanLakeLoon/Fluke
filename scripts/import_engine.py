@@ -3,6 +3,8 @@
 Import Engine — shared CSV processing logic used by both
 the CLI import script and the admin CSV Upload page.
 
+3-tier architecture: VIN → Vehicle → Sighting
+
 Usage from CLI:
     uv run scripts/import_csv.py ./data/sample.csv
 
@@ -111,7 +113,7 @@ def build_record(row: dict) -> dict:
     return record
 
 
-# ---------- main engine ----------
+# ---------- main engine (3-tier) ----------
 
 def process_csv_rows(
     rows: list[dict],
@@ -120,7 +122,8 @@ def process_csv_rows(
     import_batch: str = "unknown",
 ) -> dict:
     """
-    Process parsed CSV rows and insert into PocketBase.
+    Process parsed CSV rows and insert into PocketBase using 3-tier schema.
+    VIN → Vehicle → Sighting
 
     Returns: { "inserted": int, "duplicates_queued": int, "rejected": int,
                "rejected_rows": list, "errors": list }
@@ -135,6 +138,8 @@ def process_csv_rows(
 
     with httpx.Client(timeout=30.0) as client:
         headers = {"Authorization": token}
+        vin_cache: dict[str, str | None] = {}     # vin string → vin record id
+        vehicle_cache: dict[str, str | None] = {}  # plate → vehicle record id
 
         for i, csv_row in enumerate(rows, start=1):
             # 1. Map columns
@@ -150,16 +155,97 @@ def process_csv_rows(
             # 3. Build record
             record = build_record(mapped)
 
-            # 4. Duplicate check (plate + date + location)
+            # 4. VIN phase — find or create VIN record
+            vin_relation_id = None
+            vin_str = record.pop("vin", "")
+            title_issues = record.pop("title_issues", "")
+
+            if vin_str:
+                if vin_str in vin_cache:
+                    vin_relation_id = vin_cache[vin_str]
+                else:
+                    try:
+                        # Try to find existing VIN
+                        check = client.get(
+                            f"{pb_url}/api/collections/vins/records",
+                            params={"filter": f'vin = "{vin_str}"', "perPage": 1},
+                            headers=headers,
+                        )
+                        items = check.json().get("items", [])
+                        if items:
+                            vin_relation_id = items[0]["id"]
+                            # Backfill title_issues if missing
+                            if title_issues and not items[0].get("title_issues"):
+                                client.patch(
+                                    f"{pb_url}/api/collections/vins/records/{vin_relation_id}",
+                                    json={"title_issues": title_issues},
+                                    headers=headers,
+                                )
+                        else:
+                            # Create new VIN record
+                            resp = client.post(
+                                f"{pb_url}/api/collections/vins/records",
+                                json={"vin": vin_str, "title_issues": title_issues},
+                                headers=headers,
+                            )
+                            vin_relation_id = resp.json()["id"]
+                    except Exception as e:
+                        result["errors"].append(f"Row {i}: VIN lookup/create failed: {e}")
+
+                    vin_cache[vin_str] = vin_relation_id
+
+            # 5. Vehicle phase — find or create Vehicle
             plate = record["plate"]
+            vehicle_id = None
+
+            if plate in vehicle_cache:
+                vehicle_id = vehicle_cache[plate]
+            else:
+                try:
+                    check = client.get(
+                        f"{pb_url}/api/collections/vehicles/records",
+                        params={"filter": f'plate = "{plate}"', "perPage": 1},
+                        headers=headers,
+                    )
+                    items = check.json().get("items", [])
+                    if items:
+                        vehicle_id = items[0]["id"]
+                        # Backfill vin_relation if missing
+                        if vin_relation_id and not items[0].get("vin_relation"):
+                            client.patch(
+                                f"{pb_url}/api/collections/vehicles/records/{vehicle_id}",
+                                json={"vin_relation": vin_relation_id},
+                                headers=headers,
+                            )
+                    else:
+                        # Create new vehicle
+                        veh_data = {
+                            "plate": plate,
+                            "state": record.get("state", ""),
+                            "make": record.get("make", ""),
+                            "model": record.get("model", ""),
+                            "color": record.get("color", ""),
+                            "registration": record.get("registration", ""),
+                            "vin_relation": vin_relation_id or "",
+                            "searchable": record.get("searchable", False),
+                        }
+                        resp = client.post(
+                            f"{pb_url}/api/collections/vehicles/records",
+                            json=veh_data,
+                            headers=headers,
+                        )
+                        vehicle_id = resp.json()["id"]
+                except Exception as e:
+                    result["errors"].append(f"Row {i}: vehicle lookup/create failed: {e}")
+                    continue
+
+                vehicle_cache[plate] = vehicle_id
+
+            # 6. Duplicate check (vehicle + date + location)
             date = record.get("date") or ""
             location = record.get("location") or ""
 
-            filter_parts = [f'plate = "{plate}"']
-            if date:
-                filter_parts.append(f'date = "{date}"')
-            else:
-                filter_parts.append('date = ""')
+            filter_parts = [f'vehicle = "{vehicle_id}"']
             if location:
                 filter_parts.append(f'location = "{location}"')
             else:
@@ -169,19 +255,28 @@ def process_csv_rows(
 
             try:
                 check = client.get(
-                    f"{pb_url}/api/collections/alpr_records/records",
-                    params={"filter": filter_str, "perPage": 1, "skipTotal": False},
+                    f"{pb_url}/api/collections/sightings/records",
+                    params={"filter": filter_str, "perPage": 50, "skipTotal": False},
                     headers=headers,
                 )
                 check_data = check.json()
-                total = check_data.get("totalItems", 0)
+                # Check for matching date
+                is_dup = False
+                existing_id = None
+                rec_date = date[:10] if date else None
+                for item in check_data.get("items", []):
+                    ex_date = item.get("date", "")[:10] if item.get("date") else None
+                    if ex_date == rec_date:
+                        is_dup = True
+                        existing_id = item["id"]
+                        break
             except Exception as e:
                 result["errors"].append(f"Row {i}: duplicate check failed: {e}")
-                total = 0
+                is_dup = False
+                existing_id = None
 
-            if total > 0:
+            if is_dup:
                 # Stage as duplicate
-                existing_id = check_data.get("items", [{}])[0].get("id")
                 try:
                     client.post(
                         f"{pb_url}/api/collections/duplicate_queue/records",
@@ -199,11 +294,20 @@ def process_csv_rows(
                     result["errors"].append(f"Row {i}: failed to queue duplicate: {e}")
                 continue
 
-            # 5. Insert
+            # 7. Insert sighting
             try:
+                sighting_data = {
+                    "vehicle": vehicle_id,
+                    "location": record.get("location", ""),
+                    "date": record.get("date"),
+                    "ice": record.get("ice", ""),
+                    "match_status": record.get("match_status", ""),
+                    "plate_confidence": record.get("plate_confidence", 0),
+                    "notes": record.get("notes", ""),
+                }
                 resp = client.post(
-                    f"{pb_url}/api/collections/alpr_records/records",
-                    json=record,
+                    f"{pb_url}/api/collections/sightings/records",
+                    json=sighting_data,
                     headers=headers,
                 )
                 if resp.is_success:

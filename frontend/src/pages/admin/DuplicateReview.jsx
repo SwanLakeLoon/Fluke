@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { pb } from '../../api/client';
+import { findOrCreateVin } from '../../utils/ingestPipeline';
 import './AdminPages.css';
 
 export default function DuplicateReview() {
@@ -76,14 +77,25 @@ export default function DuplicateReview() {
   const handleKeepBoth = async (dup) => {
     if (!window.confirm("Insert the incoming record as a completely new entry?")) return;
     try {
+      // VIN phase
+      let vinRelationId = null;
+      if (dup.raw_data.vin) {
+        const vinRec = await findOrCreateVin(pb, dup.raw_data.vin, dup.raw_data.title_issues);
+        vinRelationId = vinRec?.id || null;
+      }
+
       let vehicle;
       try {
         vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${dup.raw_data.plate}"`);
+        // Backfill vin_relation if missing
+        if (vinRelationId && !vehicle.vin_relation) {
+          vehicle = await pb.collection('vehicles').update(vehicle.id, { vin_relation: vinRelationId });
+        }
       } catch (e) {
         vehicle = await pb.collection('vehicles').create({
           plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
           model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
-          vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues, searchable: dup.raw_data.searchable ?? false,
+          vin_relation: vinRelationId || '', searchable: dup.raw_data.searchable ?? false,
         });
       }
       await pb.collection('sightings').create({
@@ -102,6 +114,13 @@ export default function DuplicateReview() {
   const handleReplace = async (dup) => {
     if (!window.confirm("Overwrite the existing database record with the incoming data?")) return;
     try {
+      // VIN phase
+      let vinRelationId = null;
+      if (dup.raw_data.vin) {
+        const vinRec = await findOrCreateVin(pb, dup.raw_data.vin, dup.raw_data.title_issues);
+        vinRelationId = vinRec?.id || null;
+      }
+
       if (dup.existing_record_id) {
         // Fetch FIRST to get vehicle FK, then write
         const existingSighting = await pb.collection('sightings').getOne(dup.existing_record_id);
@@ -113,7 +132,7 @@ export default function DuplicateReview() {
         await pb.collection('vehicles').update(existingSighting.vehicle, {
           state: dup.raw_data.state, make: dup.raw_data.make, model: dup.raw_data.model, 
           color: dup.raw_data.color, registration: dup.raw_data.registration,
-          vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues,
+          vin_relation: vinRelationId || '',
         });
       } else {
         let vehicle;
@@ -123,7 +142,7 @@ export default function DuplicateReview() {
           vehicle = await pb.collection('vehicles').create({
             plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
             model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
-            vin: dup.raw_data.vin, title_issues: dup.raw_data.title_issues, searchable: dup.raw_data.searchable ?? false,
+            vin_relation: vinRelationId || '', searchable: dup.raw_data.searchable ?? false,
           });
         }
         await pb.collection('sightings').create({

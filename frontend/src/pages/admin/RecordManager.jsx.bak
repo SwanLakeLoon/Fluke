@@ -9,7 +9,6 @@ const VALID_MATCH = ['Y', 'N', ''];
 
 export default function RecordManager() {
   const [records, setRecords] = useState([]);
-  const [viewMode, setViewMode] = useState('plate'); // 'plate' or 'vin'
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
   const [totalItems, setTotalItems] = useState(0);
@@ -27,14 +26,12 @@ export default function RecordManager() {
     switch (sb) {
       case '-date': return '-latest_sighting';
       case 'date': return 'latest_sighting';
-      case '-location': return viewMode === 'vin' ? '-latest_sighting' : '-location_list';
-      case 'location': return viewMode === 'vin' ? 'latest_sighting' : 'location_list';
+      case '-location': return '-location_list';
+      case 'location': return 'location_list';
       case '-searchable': return '-searchable';
       case 'searchable': return 'searchable';
       case '-sightings': return '-sighting_count';
       case 'sightings': return 'sighting_count';
-      case 'plate': return viewMode === 'vin' ? 'plate_list' : 'plate';
-      case '-plate': return viewMode === 'vin' ? '-plate_list' : '-plate';
       default: return sb; // plate, -plate
     }
   };
@@ -42,10 +39,8 @@ export default function RecordManager() {
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const statsFilter = filterPlate ? (viewMode === 'vin' ? `vin ~ "${filterPlate}" || plate_list ~ "${filterPlate}"` : `plate ~ "${filterPlate}"`) : '';
-      const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
-      
-      const statsRes = await pb.collection(statsCollection).getList(page, 25, {
+      const statsFilter = filterPlate ? `plate ~ "${filterPlate}"` : '';
+      const statsRes = await pb.collection('enhanced_plate_stats').getList(page, 25, {
         filter: statsFilter || undefined,
         sort: getStatsSort(sortBy),
       });
@@ -53,28 +48,17 @@ export default function RecordManager() {
       setTotalPages(statsRes.totalPages);
       setTotalItems(statsRes.totalItems);
 
-      const rootIds = statsRes.items.map(s => s.id);
-      if (rootIds.length === 0) {
-        setRecords([]);
-        setLoading(false);
-        return;
-      }
-
-      if (viewMode === 'plate') {
-        const vehFilterStr = rootIds.map(id => `id = "${id}"`).join(' || ');
+      const vehicleIds = statsRes.items.map(s => s.id);
+      if (vehicleIds.length > 0) {
+        const vehFilterStr = vehicleIds.map(id => `id = "${id}"`).join(' || ');
         const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr, expand: 'vin_relation' });
-        const sightFilterStr = rootIds.map(id => `vehicle = "${id}"`).join(' || ');
+        const sightFilterStr = vehicleIds.map(id => `vehicle = "${id}"`).join(' || ');
         const sightRes = await pb.collection('sightings').getFullList({ filter: sightFilterStr, sort: '-date' });
 
         const vmap = new Map();
         for (const v of vehRes) {
           const vinRec = v.expand?.vin_relation;
-          vmap.set(v.id, { 
-            ...v, 
-            _vin: vinRec?.vin || v.vin || '', 
-            _title_issues: vinRec?.title_issues || v.title_issues || '', 
-            sightings: [] 
-          });
+          vmap.set(v.id, { ...v, _vin: vinRec?.vin || '', _title_issues: vinRec?.title_issues || '', sightings: [] });
         }
         for (const s of sightRes) {
           if (vmap.has(s.vehicle)) vmap.get(s.vehicle).sightings.push(s);
@@ -83,46 +67,7 @@ export default function RecordManager() {
         const grouped = statsRes.items.map(s => vmap.get(s.id)).filter(Boolean);
         setRecords(grouped);
       } else {
-        // VIN Mode
-        const vehFilterStr = rootIds.map(id => `vin_relation = "${id}"`).join(' || ');
-        const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr });
-        
-        const vehicleMap = new Map();
-        const vehicleIds = vehRes.map(v => v.id);
-        for (const v of vehRes) vehicleMap.set(v.id, v);
-
-        let sightRes = [];
-        if (vehicleIds.length > 0) {
-          const sightFilterStr = vehicleIds.map(id => `vehicle = "${id}"`).join(' || ');
-          sightRes = await pb.collection('sightings').getFullList({ filter: sightFilterStr, sort: '-date' });
-        }
-
-        const vinMap = new Map();
-        for (const vinItem of statsRes.items) {
-           vinMap.set(vinItem.id, { 
-             ...vinItem, 
-             isVinMode: true,
-             sightings: [] 
-           });
-        }
-
-        for (const s of sightRes) {
-           const v = vehicleMap.get(s.vehicle);
-           if (v && v.vin_relation) {
-              const vinObj = vinMap.get(v.vin_relation);
-              if (vinObj) {
-                 vinObj.sightings.push({ 
-                   ...s, 
-                   _plate: v.plate, _state: v.state, _make: v.make, _model: v.model, 
-                   _color: v.color, _registration: v.registration, 
-                   _title_issues: vinObj.title_issues, _vehicleId: v.id 
-                 });
-              }
-           }
-        }
-        
-        const grouped = statsRes.items.map(s => vinMap.get(s.id)).filter(Boolean);
-        setRecords(grouped);
+        setRecords([]);
       }
     } catch (e) {
       console.error('Fetch error:', e);
@@ -130,8 +75,7 @@ export default function RecordManager() {
     setLoading(false);
   };
 
-  // eslint-disable-next-line
-  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode]);
+  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy]);
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -163,10 +107,10 @@ export default function RecordManager() {
     });
   };
 
-  const toggleExpand = (recordId) => {
+  const toggleExpand = (plate) => {
     setExpandedPlates(prev => {
       const next = new Set(prev);
-      next.has(recordId) ? next.delete(recordId) : next.add(recordId);
+      next.has(plate) ? next.delete(plate) : next.add(plate);
       return next;
     });
   };
@@ -175,7 +119,7 @@ export default function RecordManager() {
     const vIds = new Set();
     records.forEach(v => {
       v.sightings.forEach(s => {
-        if (selected.has(s.id)) vIds.add(v.isVinMode ? s._vehicleId : v.id);
+        if (selected.has(s.id)) vIds.add(v.id);
       });
     });
     for (const id of vIds) {
@@ -192,18 +136,18 @@ export default function RecordManager() {
   // --- Inline Edit ---
   const startEditSubrow = (v, r) => {
     setEditingId(r.id);
-    setEditingVehicleId(v.isVinMode ? r._vehicleId : v.id);
+    setEditingVehicleId(v.id);
     setEditData({
-      plate: (v.isVinMode ? r._plate : v.plate) || '',
-      state: (v.isVinMode ? r._state : v.state) || '',
-      make: (v.isVinMode ? r._make : v.make) || '',
-      model: (v.isVinMode ? r._model : v.model) || '',
-      color: (v.isVinMode ? r._color : v.color) || '',
+      plate: v.plate || '',
+      state: v.state || '',
+      make: v.make || '',
+      model: v.model || '',
+      color: v.color || '',
       ice: r.ice || '',
       match_status: r.match_status || '',
-      registration: (v.isVinMode ? r._registration : v.registration) || '',
-      vin: v.isVinMode ? v.vin : (v._vin || ''),
-      title_issues: v.isVinMode ? v.title_issues : (v._title_issues || ''),
+      registration: v.registration || '',
+      vin: v._vin || '',
+      title_issues: v._title_issues || '',
       notes: r.notes || '',
       location: r.location || '',
       date: r.date || '',
@@ -299,16 +243,9 @@ export default function RecordManager() {
     fetchRecords();
   };
 
-  const handleSearchableToggle = async (v, currentSearchable) => {
+  const handleSearchableToggle = async (vehicle, currentSearchable) => {
     try {
-      if (v.isVinMode) {
-         const vehicles = await pb.collection('vehicles').getFullList({ filter: `vin_relation = "${v.id}"` });
-         for (const veh of vehicles) {
-            await pb.collection('vehicles').update(veh.id, { searchable: !currentSearchable });
-         }
-      } else {
-         await pb.collection('vehicles').update(v.id, { searchable: !currentSearchable });
-      }
+      await pb.collection('vehicles').update(vehicle.id, { searchable: !currentSearchable });
       fetchRecords(); // Refetch to correctly bubble searchable state to vehicle root
     } catch (e) {
       console.error('Toggle failed:', e);
@@ -318,13 +255,7 @@ export default function RecordManager() {
   return (
     <div className="page">
       <div className="container">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 className="admin-title" style={{ margin: 0 }}>Records Manager</h1>
-          <div className="btn-group flex gap-sm bg-base-200 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
-            <button className={`btn btn-sm ${viewMode === 'plate' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('plate'); setPage(1); }}>Plate View</button>
-            <button className={`btn btn-sm ${viewMode === 'vin' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('vin'); setPage(1); }}>VIN View</button>
-          </div>
-        </div>
+        <h1 className="admin-title">Records Manager</h1>
 
         {/* Toolbar */}
         <div className="records-toolbar">
@@ -416,25 +347,14 @@ export default function RecordManager() {
             <thead>
               <tr>
                 <th style={{ width: 40 }}><input type="checkbox" onChange={selectAll} checked={selected.size > 0 && selected.size === records.flatMap(v => v.sightings).length} /></th>
-                <th>{viewMode === 'vin' ? 'VIN' : 'Plate'}</th>
-                {viewMode === 'vin' ? (
-                  <>
-                    <th>Plates</th>
-                    <th>Title Issues</th>
-                    <th>Latest Sighting</th>
-                    <th colSpan={4}>Sightings</th>
-                  </>
-                ) : (
-                  <>
-                    <th>State</th>
-                    <th>Date</th>
-                    <th>Make</th>
-                    <th>Model</th>
-                    <th>ICE</th>
-                    <th>Matches Reg.?</th>
-                    <th>Location</th>
-                  </>
-                )}
+                <th>Plate</th>
+                <th>State</th>
+                <th>Date</th>
+                <th>Make</th>
+                <th>Model</th>
+                <th>ICE</th>
+                <th>Matches Reg.?</th>
+                <th>Location</th>
                 <th>Searchable</th>
                 <th>Actions</th>
               </tr>
@@ -445,7 +365,7 @@ export default function RecordManager() {
               ) : records.length === 0 ? (
                 <tr><td colSpan={11} style={{ textAlign: 'center', padding: '2rem' }}>No records found</td></tr>
               ) : records.map(v => (
-                <React.Fragment key={v.id}>
+                <React.Fragment key={v.plate}>
                   {/* ===== VEHICLE SUMMARY ROW ===== */}
                   <tr className="vehicle-summary-row" style={{ background: 'rgba(255,255,255,0.03)' }}>
                     <td>
@@ -457,7 +377,7 @@ export default function RecordManager() {
                       />
                     </td>
                     <td>
-                      <div><strong>{v.isVinMode ? (v.vin || 'Unknown VIN') : v.plate}</strong></div>
+                      <div><strong>{v.plate}</strong></div>
                       {v.sightings.length > 1 && (
                         <div style={{ marginTop: '4px' }}>
                           <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
@@ -466,38 +386,27 @@ export default function RecordManager() {
                         </div>
                       )}
                     </td>
-                    {v.isVinMode ? (
-                      <>
-                        <td>{v.plate_list ? v.plate_list.split(',').join(', ') : '—'}</td>
-                        <td>{v.title_issues || '—'}</td>
-                        <td>{v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString() : '—'}</td>
-                        <td colSpan={4} style={{ opacity: 0.5 }}>Expand to view individual sightings...</td>
-                      </>
-                    ) : (
-                      <>
-                        <td>{v.state}</td>
-                        <td>{v.sightings[0]?.date ? new Date(v.sightings[0].date).toLocaleDateString() : '—'}</td>
-                        <td>{v.make}</td>
-                        <td>{v.model}</td>
-                        <td>
-                          <span className={`badge ${v.sightings[0]?.ice === 'Y' || v.sightings[0]?.ice === 'HS' ? 'badge-warning' : 'badge-muted'}`}>
-                            {v.sightings[0]?.ice || '—'}
-                          </span>
-                        </td>
-                        <td>
-                          <span className={`badge ${v.sightings[0]?.match_status === 'N' ? 'badge-warning' : 'badge-muted'}`}>
-                            {v.sightings[0]?.match_status || '—'}
-                          </span>
-                        </td>
-                        <td>
-                          {(() => {
-                            const locs = new Set(v.sightings.map(s => s.location).filter(Boolean));
-                            if (locs.size > 1) return <span className="badge badge-warning">Multiple</span>;
-                            return locs.size === 1 ? [...locs][0] : '—';
-                          })()}
-                        </td>
-                      </>
-                    )}
+                    <td>{v.state}</td>
+                    <td>{v.sightings[0]?.date ? new Date(v.sightings[0].date).toLocaleDateString() : '—'}</td>
+                    <td>{v.make}</td>
+                    <td>{v.model}</td>
+                    <td>
+                      <span className={`badge ${v.sightings[0]?.ice === 'Y' || v.sightings[0]?.ice === 'HS' ? 'badge-warning' : 'badge-muted'}`}>
+                        {v.sightings[0]?.ice || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`badge ${v.sightings[0]?.match_status === 'N' ? 'badge-warning' : 'badge-muted'}`}>
+                        {v.sightings[0]?.match_status || '—'}
+                      </span>
+                    </td>
+                    <td>
+                      {(() => {
+                        const locs = new Set(v.sightings.map(s => s.location).filter(Boolean));
+                        if (locs.size > 1) return <span className="badge badge-warning">Multiple</span>;
+                        return locs.size === 1 ? [...locs][0] : '—';
+                      })()}
+                    </td>
                     <td>
                       <button
                         className={`btn btn-sm ${v.searchable ? 'btn-primary' : 'btn-ghost'}`}
@@ -507,14 +416,14 @@ export default function RecordManager() {
                       </button>
                     </td>
                     <td>
-                      <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(v.id)}>
-                        {expandedPlates.has(v.id) ? '▲ Hide' : '▼ Expand'}
+                      <button className="btn btn-ghost btn-sm" onClick={() => toggleExpand(v.plate)}>
+                        {expandedPlates.has(v.plate) ? '▲ Hide' : '▼ Expand'}
                       </button>
                     </td>
                   </tr>
 
                   {/* ===== EXPANDED SIGHTINGS SUB-ROWS ===== */}
-                  {expandedPlates.has(v.id) && v.sightings.map(r => (
+                  {expandedPlates.has(v.plate) && v.sightings.map(r => (
                     editingId === r.id ? (
                       /* === INLINE EDIT SIGHTING === */
                       <tr key={r.id} className="editing-row">
@@ -562,32 +471,21 @@ export default function RecordManager() {
                           <input type="checkbox" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} />
                         </td>
                         <td style={{ paddingLeft: '1.5rem', opacity: 0.6 }}>↳ Sighting</td>
-                        {v.isVinMode ? (
-                          <>
-                            <td>{r._plate || '—'}</td>
-                            <td style={{ opacity: 0.5 }}>—</td>
-                            <td>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
-                            <td colSpan={4}>{r.location || '—'}</td>
-                          </>
-                        ) : (
-                          <>
-                            <td style={{ opacity: 0.5 }}>—</td>
-                            <td>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
-                            <td style={{ opacity: 0.5 }}>—</td>
-                            <td style={{ opacity: 0.5 }}>—</td>
-                            <td>
-                              <span className={`badge ${r.ice === 'Y' || r.ice === 'HS' ? 'badge-warning' : 'badge-muted'}`}>
-                                {r.ice || '—'}
-                              </span>
-                            </td>
-                            <td>
-                              <span className={`badge ${r.match_status === 'N' ? 'badge-warning' : 'badge-muted'}`}>
-                                {r.match_status || '—'}
-                              </span>
-                            </td>
-                            <td>{r.location || '—'}</td>
-                          </>
-                        )}
+                        <td style={{ opacity: 0.5 }}>—</td>
+                        <td>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+                        <td style={{ opacity: 0.5 }}>—</td>
+                        <td style={{ opacity: 0.5 }}>—</td>
+                        <td>
+                          <span className={`badge ${r.ice === 'Y' || r.ice === 'HS' ? 'badge-warning' : 'badge-muted'}`}>
+                            {r.ice || '—'}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`badge ${r.match_status === 'N' ? 'badge-warning' : 'badge-muted'}`}>
+                            {r.match_status || '—'}
+                          </span>
+                        </td>
+                        <td>{r.location || '—'}</td>
                         <td>
                           <button
                             className={`btn btn-sm ${v.searchable ? 'btn-primary' : 'btn-ghost'}`}
