@@ -8,7 +8,7 @@ Usage:
 """
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx"]
+# dependencies = ["httpx", "python-dateutil"]
 # ///
 
 import csv

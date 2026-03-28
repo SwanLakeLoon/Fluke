@@ -89,6 +89,11 @@ export default function CsvUpload() {
     const rejected = preview.filter(r => r.errors.length > 0).length + rejectedCount;
 
     setResult({ inserted, dupsQueued, rejected });
+
+    // Trigger prior sightings lookup for imported plates
+    const uniquePlates = [...new Set(validRows.map(r => r.mapped.plate).filter(Boolean))];
+    lookupPriorSightings(uniquePlates);
+
     setImporting(false);
     setPreview([]);
     setValidationErrors([]);

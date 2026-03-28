@@ -86,7 +86,8 @@ export default function DuplicateReview() {
 
       let vehicle;
       try {
-        vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${dup.raw_data.plate}"`);
+        const safePlate = (dup.raw_data.plate || '').replace(/"/g, '\\"');
+        vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${safePlate}"`);
         // Backfill vin_relation if missing
         if (vinRelationId && !vehicle.vin_relation) {
           vehicle = await pb.collection('vehicles').update(vehicle.id, { vin_relation: vinRelationId });
@@ -137,7 +138,8 @@ export default function DuplicateReview() {
       } else {
         let vehicle;
         try {
-          vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${dup.raw_data.plate}"`);
+          const safePlate = (dup.raw_data.plate || '').replace(/"/g, '\\"');
+          vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${safePlate}"`);
         } catch (e) {
           vehicle = await pb.collection('vehicles').create({
             plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,

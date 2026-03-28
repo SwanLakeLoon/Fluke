@@ -27,14 +27,15 @@ export default function Search() {
 
   // Build filter string for enhanced_plate_stats view
   const buildFilter = useCallback(() => {
+    const esc = (s) => s.replace(/"/g, '\\"');
     const parts = ['searchable = true'];
-    if (filters.plate)        parts.push(`plate ~ "${filters.plate}"`);
-    if (filters.state)         parts.push(`state_list ~ "${filters.state}"`);
-    if (filters.ice)           parts.push(`ice_list ~ "${filters.ice}"`);
-    if (filters.match_status)  parts.push(`match_status_list ~ "${filters.match_status}"`);
-    if (filters.vin)           parts.push(`vin_list ~ "${filters.vin}"`);
-    if (filters.location)      parts.push(`location_list ~ "${filters.location}"`);
-    if (filters.sightings)     parts.push(`sighting_count >= ${filters.sightings}`);
+    if (filters.plate)        parts.push(`plate ~ "${esc(filters.plate)}"`);
+    if (filters.state)         parts.push(`state_list ~ "${esc(filters.state)}"`);
+    if (filters.ice)           parts.push(`ice_list ~ "${esc(filters.ice)}"`);
+    if (filters.match_status)  parts.push(`match_status_list ~ "${esc(filters.match_status)}"`);
+    if (filters.vin)           parts.push(`vin_list ~ "${esc(filters.vin)}"`);
+    if (filters.location)      parts.push(`location_list ~ "${esc(filters.location)}"`);
+    if (filters.sightings)     parts.push(`sighting_count >= ${parseInt(filters.sightings, 10) || 0}`);
     return parts.join(' && ');
   }, [filters]);
 

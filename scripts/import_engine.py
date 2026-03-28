@@ -14,7 +14,7 @@ Usage from Python:
 """
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx"]
+# dependencies = ["httpx", "python-dateutil"]
 # ///
 
 import httpx
@@ -91,6 +91,8 @@ def derive_searchable(row: dict) -> bool:
     return row.get("ice", "") in ("Y", "HS")
 
 
+import dateutil.parser
+
 def build_record(row: dict) -> dict:
     """Build a PocketBase-ready record dict from a mapped row."""
     searchable = derive_searchable(row)
@@ -105,8 +107,16 @@ def build_record(row: dict) -> dict:
     else:
         record["plate_confidence"] = 0.0
 
-    # Blank date should be None
-    if not record.get("date"):
+    # Robust Date Normalization
+    raw_date = record.get("date", "").strip()
+    if raw_date:
+        try:
+            dt = dateutil.parser.parse(raw_date)
+            # PocketBase natively ingests ISO formatted UTC strings
+            record["date"] = dt.strftime("%Y-%m-%d %H:%M:%S.000Z")
+        except Exception:
+            record["date"] = None
+    else:
         record["date"] = None
 
     record["searchable"] = searchable

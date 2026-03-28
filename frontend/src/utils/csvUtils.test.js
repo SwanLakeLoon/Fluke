@@ -37,8 +37,23 @@ describe('csvUtils', () => {
     });
 
     it('handles Dates plural column fallback', () => {
-      expect(mapRow({ 'Dates': '2024-01-01' }).date).toBe('2024-01-01');
-      expect(mapRow({ 'Date': '2024-02-02', 'Dates': '2024-01-01' }).date).toBe('2024-02-02');
+      expect(mapRow({ 'Dates': '2024-01-01' }).date).toBe('2024-01-01T00:00:00.000Z');
+      expect(mapRow({ 'Date': '2024-02-02', 'Dates': '2024-01-01' }).date).toBe('2024-02-02T00:00:00.000Z');
+    });
+
+    it('normalizes various date formats to ISO', () => {
+      // MM/DD/YYYY — parsed as local time, verify the date prefix
+      expect(mapRow({ 'Date': '03/13/2026' }).date).toContain('2026-03-13');
+      // M/D/YYYY
+      expect(mapRow({ 'Date': '3/13/2026' }).date).toContain('2026-03-13');
+      // Already ISO
+      expect(mapRow({ 'Date': '2026-03-13' }).date).toContain('2026-03-13');
+      // Date with time
+      expect(mapRow({ 'Date': '2026-03-13 14:30:00' }).date).not.toBeNull();
+      // All normalized dates should end with Z (ISO format)
+      expect(mapRow({ 'Date': '03/13/2026' }).date).toMatch(/Z$/);
+      // Gibberish → null
+      expect(mapRow({ 'Date': 'not-a-date-xyz' }).date).toBeNull();
     });
 
     it('forces blank dates to null', () => {
@@ -78,6 +93,38 @@ describe('csvUtils', () => {
       expect(result.some(e => e.includes('invalid color'))).toBe(true);
       expect(result.some(e => e.includes('invalid ICE'))).toBe(true);
       expect(result.some(e => e.includes('invalid match'))).toBe(true);
+    });
+
+    it('validates OR as a valid color', () => {
+      expect(validateRow({ plate: 'A', color: 'OR' })).toHaveLength(0);
+    });
+  });
+
+  describe('mapRow (edge cases)', () => {
+    it('trims whitespace on all fields', () => {
+      const row = { 'Plate': '  XYZ 789  ', 'State': ' MN ', 'Make': ' Toyota ' };
+      const result = mapRow(row);
+      expect(result.plate).toBe('XYZ 789');
+      expect(result.state).toBe('MN');
+      expect(result.make).toBe('Toyota');
+    });
+
+    it('handles completely empty CSV row', () => {
+      const result = mapRow({});
+      expect(result.plate).toBe('');
+      expect(result.date).toBeNull();
+      expect(result.plate_confidence).toBe(0);
+      expect(result.searchable).toBe(false);
+    });
+
+    it('maps VIN and title_issues columns', () => {
+      const row = {
+        'VIN Associated to Plate (if available)': '1HGCM82633A004352',
+        'Title Issues Associated to VIN (if available)': 'Salvage title',
+      };
+      const result = mapRow(row);
+      expect(result.vin).toBe('1HGCM82633A004352');
+      expect(result.title_issues).toBe('Salvage title');
     });
   });
 });

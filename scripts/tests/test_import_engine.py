@@ -90,3 +90,36 @@ def test_build_record_confidence_fallback():
     # Empty
     record2 = build_record({"plate": "B"})
     assert record2["plate_confidence"] == 0
+
+def test_build_record_date_normalization():
+    # ISO format
+    record = build_record({"plate": "A", "date": "2026-03-13", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is not None
+    assert "2026-03-13" in record["date"]
+
+    # MM/DD/YYYY
+    record = build_record({"plate": "A", "date": "03/13/2026", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is not None
+    assert "2026-03-13" in record["date"]
+
+    # M/D/YYYY
+    record = build_record({"plate": "A", "date": "3/13/2026", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is not None
+    assert "2026-03-13" in record["date"]
+
+    # Blank/empty date
+    record = build_record({"plate": "A", "date": "", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is None
+
+    # Whitespace-only date
+    record = build_record({"plate": "A", "date": "   ", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is None
+
+    # Gibberish
+    record = build_record({"plate": "A", "date": "not-a-real-date", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is None
+
+    # Date with time component
+    record = build_record({"plate": "A", "date": "2026-03-13 14:30:00", "_searchable_from_csv": None, "ice": "N"})
+    assert record["date"] is not None
+    assert "2026-03-13" in record["date"]

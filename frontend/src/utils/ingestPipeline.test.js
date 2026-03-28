@@ -19,6 +19,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
+  findOrCreateVin,
   findOrCreateVehicle,
   findDuplicateSighting,
   ingestRecord,
@@ -331,5 +332,106 @@ describe('processBatch', () => {
     expect(counts.inserted).toBe(1);
     expect(counts.dupsQueued).toBe(1);
     expect(counts.errors).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findOrCreateVin
+// ---------------------------------------------------------------------------
+
+describe('findOrCreateVin', () => {
+  it('returns null for empty VIN string', async () => {
+    const pb = makePb();
+    const result = await findOrCreateVin(pb, '', 'some title issues');
+    expect(result).toBeNull();
+    expect(pb._mocks.vins.getFirstListItem).not.toHaveBeenCalled();
+    expect(pb._mocks.vins.create).not.toHaveBeenCalled();
+  });
+
+  it('returns null for undefined VIN', async () => {
+    const pb = makePb();
+    const result = await findOrCreateVin(pb, undefined, '');
+    expect(result).toBeNull();
+  });
+
+  it('returns existing VIN record when found', async () => {
+    const pb = makePb();
+    const existingVin = { id: 'vin001', vin: 'TESTVIN123', title_issues: 'Salvage' };
+    pb._mocks.vins.getFirstListItem.mockResolvedValue(existingVin);
+
+    const result = await findOrCreateVin(pb, 'TESTVIN123', '');
+
+    expect(result.id).toBe('vin001');
+    expect(pb._mocks.vins.create).not.toHaveBeenCalled();
+  });
+
+  it('backfills title_issues on existing VIN if missing', async () => {
+    const pb = makePb();
+    const existingVin = { id: 'vin001', vin: 'TESTVIN123', title_issues: '' };
+    pb._mocks.vins.getFirstListItem.mockResolvedValue(existingVin);
+    pb._mocks.vins.update.mockResolvedValue({ ...existingVin, title_issues: 'Salvage' });
+
+    const result = await findOrCreateVin(pb, 'TESTVIN123', 'Salvage');
+
+    expect(pb._mocks.vins.update).toHaveBeenCalledWith('vin001', { title_issues: 'Salvage' });
+    expect(result.title_issues).toBe('Salvage');
+  });
+
+  it('does NOT overwrite existing title_issues', async () => {
+    const pb = makePb();
+    const existingVin = { id: 'vin001', vin: 'TESTVIN123', title_issues: 'Already Set' };
+    pb._mocks.vins.getFirstListItem.mockResolvedValue(existingVin);
+
+    await findOrCreateVin(pb, 'TESTVIN123', 'New Value');
+
+    expect(pb._mocks.vins.update).not.toHaveBeenCalled();
+  });
+
+  it('creates new VIN record when not found', async () => {
+    const pb = makePb();
+    pb._mocks.vins.getFirstListItem.mockRejectedValue(new Error('not found'));
+    pb._mocks.vins.create.mockResolvedValue({ id: 'vin_new', vin: 'NEW123', title_issues: 'Flood' });
+
+    const result = await findOrCreateVin(pb, 'NEW123', 'Flood');
+
+    expect(pb._mocks.vins.create).toHaveBeenCalledWith({ vin: 'NEW123', title_issues: 'Flood' });
+    expect(result.id).toBe('vin_new');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findDuplicateSighting — additional edge cases
+// ---------------------------------------------------------------------------
+
+describe('findDuplicateSighting (edge cases)', () => {
+  it('treats empty location as matching location=""', async () => {
+    const pb = makePb();
+    pb._mocks.sightings.getList.mockResolvedValue({
+      items: [{ id: 'existing1', date: '2024-03-01T00:00:00Z' }],
+    });
+
+    const result = await findDuplicateSighting(pb, 'veh001', {
+      ...baseRecord,
+      location: '',
+    });
+
+    // Verify filter includes location = ""
+    const filterArg = pb._mocks.sightings.getList.mock.calls[0][2].filter;
+    expect(filterArg).toContain('location = ""');
+    expect(result.isDup).toBe(true);
+  });
+
+  it('does not match when dates differ even at same vehicle+location', async () => {
+    const pb = makePb();
+    pb._mocks.sightings.getList.mockResolvedValue({
+      items: [{ id: 'existing1', date: '2024-06-15T00:00:00Z' }],
+    });
+
+    const result = await findDuplicateSighting(pb, 'veh001', {
+      ...baseRecord,
+      date: '2024-03-01T00:00:00Z', // different date
+    });
+
+    expect(result.isDup).toBe(false);
   });
 });

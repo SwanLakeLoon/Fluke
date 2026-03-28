@@ -37,8 +37,20 @@ export function mapRow(csvRow) {
   if (!mapped.date) {
     mapped.date = (csvRow['Dates'] || '').trim();
   }
-  // blank date → null
-  if (!mapped.date) mapped.date = null;
+  
+  // Date Normalization
+  if (mapped.date) {
+    const parsedDate = new Date(mapped.date);
+    if (!isNaN(parsedDate.getTime())) {
+      // PocketBase natively digests ISO 8601 payloads perfectly.
+      mapped.date = parsedDate.toISOString();
+    } else {
+      mapped.date = null; // Discard unparseable gibberish formats gracefully
+    }
+  } else {
+    mapped.date = null;
+  }
+  
   return mapped;
 }
 

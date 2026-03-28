@@ -40,7 +40,6 @@ Admin scripts use Python and `uv`.
 |---|---|
 | `uv run scripts/import_csv.py <file.csv>` | Import data via CLI |
 | `uv run scripts/backup.py` | Create a snapshot backup |
-| `uv run scripts/fix-api-rules.py` | Reapply PB schema rules |
 
 ---
 
@@ -91,22 +90,17 @@ Once logged into your PocketBase admin panel (`https://your-pod.pikapods.net/_/`
 
 Run these two scripts locally, pointing them at your live pod.
 
+Run the unified initialization script locally, pointing it at your live pod. This script securely provisions the entire 3-tier database structure, creates all SQL views, and applies strict API rule assignments sequentially.
 
 ```bash
-# 1. Create collections and add role field to users
+# Safely initialize the unified 3-tier schema and security rules
 POCKETBASE_URL=https://your-pod.pikapods.net \
 PB_ADMIN_EMAIL=your-superuser@email.com \
 PB_ADMIN_PASS=your-superuser-password \
 uv run scripts/setup-schema.py
-
-# 2. Apply secure API access rules
-POCKETBASE_URL=https://your-pod.pikapods.net \
-PB_ADMIN_EMAIL=your-superuser@email.com \
-PB_ADMIN_PASS=your-superuser-password \
-uv run scripts/fix-api-rules.py
 ```
 
-When successful you will see `✅ alpr_records created` and `✅ duplicate_queue created`. If you see `⏭️ already exists` for everything, the script is still hitting localhost — double-check the `POCKETBASE_URL` env var name.
+When successful, you will see output confirming collections like `vins`, `vehicles`, `sightings`, and `enhanced_vin_stats` have been created or updated. If you see repeated API errors, double-check your credentials and ensure the `POCKETBASE_URL` env var string is completely accurate without a trailing slash.
 
 ---
 
@@ -174,7 +168,7 @@ uv run scripts/import_csv.py ./data/your-file.csv
 
 Every `git push` to `main` will automatically trigger a new Vercel deploy. No action needed.
 
-For PocketBase schema changes, re-run `setup-schema.py` and `fix-api-rules.py` against the production pod URL.
+For PocketBase schema changes, simply re-run the unified `setup-schema.py` script against the production pod URL to gracefully apply new collections or rule modifications.
 
 ---
 

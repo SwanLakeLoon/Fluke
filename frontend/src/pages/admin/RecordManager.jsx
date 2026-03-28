@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { pb } from '../../api/client';
 import { findOrCreateVin } from '../../utils/ingestPipeline';
+import { VALID_COLORS, VALID_ICE, VALID_MATCH } from '../../utils/csvUtils';
 import './AdminPages.css';
 
-const VALID_COLORS = ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU'];
-const VALID_ICE = ['Y', 'N', 'HS'];
-const VALID_MATCH = ['Y', 'N', ''];
+// Convert Sets to Arrays for .map() rendering in dropdowns
+const COLORS_LIST = [...VALID_COLORS];
+const ICE_LIST = [...VALID_ICE];
+const MATCH_LIST = [...VALID_MATCH];
 
 export default function RecordManager() {
   const [records, setRecords] = useState([]);
@@ -42,7 +44,8 @@ export default function RecordManager() {
   const fetchRecords = async () => {
     setLoading(true);
     try {
-      const statsFilter = filterPlate ? (viewMode === 'vin' ? `vin ~ "${filterPlate}" || plate_list ~ "${filterPlate}"` : `plate ~ "${filterPlate}"`) : '';
+      const safePlate = filterPlate.replace(/"/g, '\\"');
+      const statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
       const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
       
       const statsRes = await pb.collection(statsCollection).getList(page, 25, {
@@ -458,7 +461,7 @@ export default function RecordManager() {
                     </td>
                     <td>
                       <div><strong>{v.isVinMode ? (v.vin || 'Unknown VIN') : v.plate}</strong></div>
-                      {v.sightings.length > 1 && (
+                      {!v.isVinMode && v.sightings.length > 1 && (
                         <div style={{ marginTop: '4px' }}>
                           <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
                             {v.sightings.length} sightings
@@ -471,7 +474,11 @@ export default function RecordManager() {
                         <td>{v.plate_list ? v.plate_list.split(',').join(', ') : '—'}</td>
                         <td>{v.title_issues || '—'}</td>
                         <td>{v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString() : '—'}</td>
-                        <td colSpan={4} style={{ opacity: 0.5 }}>Expand to view individual sightings...</td>
+                        <td colSpan={4}>
+                          <span className="badge badge-warning" style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
+                            {v.sightings.length} sighting{v.sightings.length !== 1 ? 's' : ''}
+                          </span>
+                        </td>
                       </>
                     ) : (
                       <>
@@ -528,18 +535,18 @@ export default function RecordManager() {
                               <label>Color
                                 <select className="select select-sm" value={editData.color} onChange={e => updateEditField('color', e.target.value)}>
                                   <option value="">—</option>
-                                  {VALID_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                                  {COLORS_LIST.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                               </label>
                               <label>ICE
                                 <select className="select select-sm" value={editData.ice} onChange={e => updateEditField('ice', e.target.value)}>
                                   <option value="">—</option>
-                                  {VALID_ICE.map(v => <option key={v} value={v}>{v}</option>)}
+                                  {ICE_LIST.map(v => <option key={v} value={v}>{v}</option>)}
                                 </select>
                               </label>
                               <label>Matches Reg.?
                                 <select className="select select-sm" value={editData.match_status} onChange={e => updateEditField('match_status', e.target.value)}>
-                                  {VALID_MATCH.map(v => <option key={v || '__blank'} value={v}>{v || '—'}</option>)}
+                                  {MATCH_LIST.map(v => <option key={v || '__blank'} value={v}>{v || '—'}</option>)}
                                 </select>
                               </label>
                               <label>Location<input className="input input-sm" value={editData.location} onChange={e => updateEditField('location', e.target.value)} /></label>
