@@ -90,6 +90,9 @@ export async function findOrCreateVehicle(pb, record, vinRelationId) {
  * @returns {{ isDup: boolean, existingSightingId: string|null }}
  */
 export async function findDuplicateSighting(pb, vehicleId, record) {
+  // Normalize date comparison string (YYYY-MM-DD)
+  const recDate = record.date ? record.date.substring(0, 10) : null;
+
   const filterParts = [`vehicle = "${vehicleId}"`];
   if (record.location) {
     filterParts.push(`location = "${record.location.replace(/"/g, '\\"')}"`);
@@ -101,7 +104,6 @@ export async function findDuplicateSighting(pb, vehicleId, record) {
     filter: filterParts.join(' && '),
   });
 
-  const recDate = record.date ? record.date.substring(0, 10) : null;
   for (const existing of check.items) {
     const exDate = existing.date ? existing.date.substring(0, 10) : null;
     if (exDate === recDate) {
@@ -252,11 +254,26 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
   let inserted = 0, dupsQueued = 0, errors = 0;
   let firstError = null;
 
+  // Track sightings "in-flight" or already processed in this batch to prevent race conditions
+  // Key format: "plate|YYYY-MM-DD|location"
+  const inBatchSightings = new Set();
+
   for (let i = 0; i < records.length; i += concurrency) {
     const chunk = records.slice(i, i + concurrency);
 
     const results = await Promise.all(
-      chunk.map(record => ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache))
+      chunk.map(async record => {
+        const sightingKey = `${record.plate}|${(record.date || '').substring(0, 10)}|${record.location || ''}`;
+        
+        // Immediate internal duplicate check
+        if (inBatchSightings.has(sightingKey)) {
+          await logDuplicate(pb, record, null, `Internal duplicate in same batch: ${batchLabel}`);
+          return { result: 'duplicate' };
+        }
+        
+        inBatchSightings.add(sightingKey);
+        return ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache);
+      })
     );
 
     for (const { result, error } of results) {

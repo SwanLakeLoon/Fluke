@@ -333,6 +333,33 @@ describe('processBatch', () => {
     expect(counts.dupsQueued).toBe(1);
     expect(counts.errors).toBe(1);
   });
+
+  it('11 — handles internal duplicates in the same batch (race condition preventer)', async () => {
+    // Two identical records in the same batch
+    const record1 = { ...baseRecord, plate: 'DUP123', date: '2024-05-01T12:00:00Z' };
+    const record2 = { ...baseRecord, plate: 'DUP123', date: '2024-05-01T12:00:00Z' };
+
+    const pb = makePb();
+
+    // Vehicle lookup fails (new vehicle)
+    pb._mocks.vehicles.getFirstListItem.mockRejectedValue(new Error('not found'));
+    pb._mocks.vehicles.create.mockResolvedValue({ id: 'v1', plate: 'DUP123' });
+
+    // Sighting lookup fails (new sighting)
+    pb._mocks.sightings.getList.mockResolvedValue({ items: [] });
+    pb._mocks.sightings.create.mockResolvedValue({ id: 's1' });
+
+    const counts = await processBatch(pb, [record1, record2], 'race-test');
+
+    // Should insert 1 and queue 1 as duplicate
+    expect(counts.inserted).toBe(1);
+    expect(counts.dupsQueued).toBe(1);
+    
+    // Sighting.create should only be called once because of internal deduplication
+    expect(pb._mocks.sightings.create).toHaveBeenCalledOnce();
+    // duplicate_queue.create should be called for the second record
+    expect(pb._mocks.duplicate_queue.create).toHaveBeenCalledOnce();
+  });
 });
 
 // ---------------------------------------------------------------------------

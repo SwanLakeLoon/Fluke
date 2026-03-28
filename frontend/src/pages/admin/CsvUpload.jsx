@@ -91,8 +91,9 @@ export default function CsvUpload() {
     setResult({ inserted, dupsQueued, rejected });
 
     // Trigger prior sightings lookup for imported plates
-    const uniquePlates = [...new Set(validRows.map(r => r.mapped.plate).filter(Boolean))];
-    lookupPriorSightings(uniquePlates);
+    const mappedValidRows = validRows.map(r => r.mapped);
+    const uniquePlates = [...new Set(mappedValidRows.map(r => r.plate).filter(Boolean))];
+    lookupPriorSightings(uniquePlates, mappedValidRows);
 
     setImporting(false);
     setPreview([]);
@@ -100,7 +101,7 @@ export default function CsvUpload() {
     setFile(null);
   };
 
-  const lookupPriorSightings = async (plates) => {
+  const lookupPriorSightings = async (plates, currentBatch) => {
     if (!plates.length) { setPriorSightings({}); return; }
     try {
       const filterStr = plates.map(p => `plate = "${p.replace(/"/g, '\\"')}"`).join(' || ');
@@ -116,11 +117,31 @@ export default function CsvUpload() {
         sort: '-date',
         expand: 'vehicle',
       });
-      // Group by plate
+
+      // Group by plate, but EXCLUDE sightings that are part of the current batch
       const grouped = {};
+      const batchMap = new Map(); // plate -> Set of "YYYY-MM-DD|location"
+      for (const row of currentBatch) {
+        if (!batchMap.has(row.plate)) batchMap.set(row.plate, []);
+        batchMap.get(row.plate).push(`${(row.date || '').substring(0, 10)}|${row.location || ''}`);
+      }
+
       for (const s of sightRes) {
         const plate = s.expand?.vehicle?.plate;
         if (!plate) continue;
+
+        // Check if this sighting matches a row in the current batch
+        const sKey = `${(s.date || '').substring(0, 10)}|${s.location || ''}`;
+        const bKeys = batchMap.get(plate) || [];
+        const matchIdx = bKeys.indexOf(sKey);
+        
+        if (matchIdx !== -1) {
+          // "Consume" one instance of this sighting from the batch record
+          // so that if there are REAL duplicates in the DB, they still show up.
+          bKeys.splice(matchIdx, 1);
+          continue; 
+        }
+
         if (!grouped[plate]) grouped[plate] = [];
         grouped[plate].push(s);
       }
