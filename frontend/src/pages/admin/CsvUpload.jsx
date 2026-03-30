@@ -260,7 +260,7 @@ export default function CsvUpload() {
                       </td>
                       <td>{r.mapped.plate}</td>
                       <td>{r.mapped.state}</td>
-                      <td>{r.mapped.date ? new Date(r.mapped.date).toLocaleDateString() : '—'}</td>
+                      <td>{r.mapped.date || '—'}</td>
                       <td>{r.mapped.make}</td>
                       <td>{r.mapped.model}</td>
                       <td>{r.mapped.ice}</td>
@@ -373,7 +373,7 @@ export default function CsvUpload() {
                           <tbody>
                             {sightings.map(s => (
                               <tr key={s.id}>
-                                <td>{s.date ? new Date(s.date).toLocaleDateString() : '—'}</td>
+                                <td>{s.date ? s.date.substring(0, 10) : '—'}</td>
                                 <td>{s.location || '—'}</td>
                                 <td>
                                   <span className={`badge ${s.ice === 'Y' || s.ice === 'HS' ? 'badge-warning' : 'badge-muted'}`}>

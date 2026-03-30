@@ -37,8 +37,8 @@ describe('csvUtils', () => {
     });
 
     it('handles Dates plural column fallback', () => {
-      expect(mapRow({ 'Dates': '2024-01-01' }).date).toBe('2024-01-01T00:00:00.000Z');
-      expect(mapRow({ 'Date': '2024-02-02', 'Dates': '2024-01-01' }).date).toBe('2024-02-02T00:00:00.000Z');
+      expect(mapRow({ 'Dates': '2024-01-01' }).date).toBe('2024-01-01');
+      expect(mapRow({ 'Date': '2024-02-02', 'Dates': '2024-01-01' }).date).toBe('2024-02-02');
     });
 
     it('normalizes various date formats to ISO', () => {
@@ -50,8 +50,8 @@ describe('csvUtils', () => {
       expect(mapRow({ 'Date': '2026-03-13' }).date).toContain('2026-03-13');
       // Date with time
       expect(mapRow({ 'Date': '2026-03-13 14:30:00' }).date).not.toBeNull();
-      // All normalized dates should end with Z (ISO format)
-      expect(mapRow({ 'Date': '03/13/2026' }).date).toMatch(/Z$/);
+      // All normalized dates should be purely YYYY-MM-DD
+      expect(mapRow({ 'Date': '03/13/2026' }).date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       // Gibberish → null
       expect(mapRow({ 'Date': 'not-a-date-xyz' }).date).toBeNull();
     });
