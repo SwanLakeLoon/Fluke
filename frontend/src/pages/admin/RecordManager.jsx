@@ -473,7 +473,7 @@ export default function RecordManager() {
                       <>
                         <td>{v.plate_list ? v.plate_list.split(',').join(', ') : '—'}</td>
                         <td>{v.title_issues || '—'}</td>
-                        <td>{v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString() : '—'}</td>
+                        <td>{v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                         <td colSpan={4}>
                           <span className="badge badge-warning" style={{ fontSize: '0.8rem', padding: '0.2rem 0.6rem' }}>
                             {v.sightings.length} sighting{v.sightings.length !== 1 ? 's' : ''}
@@ -483,7 +483,7 @@ export default function RecordManager() {
                     ) : (
                       <>
                         <td>{v.state}</td>
-                        <td>{v.sightings[0]?.date ? new Date(v.sightings[0].date).toLocaleDateString() : '—'}</td>
+                        <td>{v.sightings[0]?.date ? new Date(v.sightings[0].date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                         <td>{v.make}</td>
                         <td>{v.model}</td>
                         <td>
@@ -573,13 +573,13 @@ export default function RecordManager() {
                           <>
                             <td>{r._plate || '—'}</td>
                             <td style={{ opacity: 0.5 }}>—</td>
-                            <td>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+                            <td>{r.date ? new Date(r.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                             <td colSpan={4}>{r.location || '—'}</td>
                           </>
                         ) : (
                           <>
                             <td style={{ opacity: 0.5 }}>—</td>
-                            <td>{r.date ? new Date(r.date).toLocaleDateString() : '—'}</td>
+                            <td>{r.date ? new Date(r.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                             <td style={{ opacity: 0.5 }}>—</td>
                             <td style={{ opacity: 0.5 }}>—</td>
                             <td>

@@ -231,7 +231,7 @@ export default function ApprovalQueue() {
                           <td>{row.model}</td>
                           <td>{row.ice}</td>
                           <td>{row.location}</td>
-                          <td>{row.date ? new Date(row.date).toLocaleDateString() : '—'}</td>
+                          <td>{row.date ? new Date(row.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                         </tr>
                       ))}
                     </tbody>

@@ -72,7 +72,7 @@ export default function VehicleCard({ vehicle }) {
                 <div className="vc-sighting-header">
                   <span className="vc-sighting-location">{s.location || 'Unknown location'}</span>
                   <span className="vc-sighting-date">
-                    {s.date ? new Date(s.date).toLocaleDateString() : 'No date'}
+                    {s.date ? new Date(s.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'No date'}
                   </span>
                 </div>
                 <div className="vc-sighting-meta">

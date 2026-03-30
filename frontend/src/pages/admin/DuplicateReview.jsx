@@ -248,7 +248,7 @@ export default function DuplicateReview() {
                   <DiffField  label="Make/Model" incoming={incData.make ? `${incData.make} ${incData.model}` : incData.model} existing={exData ? `${exData.make} ${exData.model}` : null} />
                   <DiffField  label="Color"    incoming={incData.color}        existing={exData?.color} />
                   <MatchField label="Location" value={incData.location} />
-                  <MatchField label="Date"     value={incData.date ? new Date(incData.date).toLocaleDateString() : '—'} />
+                  <MatchField label="Date"     value={incData.date ? new Date(incData.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'} />
                   <DiffField  label="ICE"      incoming={incData.ice}          existing={exData?.ice} />
                   <DiffField  label="Matches Reg.?" incoming={incData.match_status} existing={exData?.match_status} />
                   <DiffField  label="Notes"    incoming={incData.notes}        existing={exData?.notes} />
@@ -264,7 +264,7 @@ export default function DuplicateReview() {
                     <div className="dup-field"><strong>Make/Model:</strong> {exData.make} {exData.model}</div>
                     <div className="dup-field"><strong>Color:</strong> {exData.color}</div>
                     <MatchField label="Location" value={exData.location} />
-                    <MatchField label="Date"     value={exData.date ? new Date(exData.date).toLocaleDateString() : '—'} />
+                    <MatchField label="Date"     value={exData.date ? new Date(exData.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'} />
                     <div className="dup-field"><strong>ICE:</strong> {exData.ice}</div>
                     <div className="dup-field"><strong>Matches Reg.?:</strong> {exData.match_status}</div>
                     <div className="dup-field"><strong>Notes:</strong> {exData.notes || '—'}</div>
