@@ -264,7 +264,14 @@ def process_csv_rows(
 
                 vehicle_cache[plate] = vehicle_id
 
-            # 6. Duplicate check (vehicle + date + location)
+            # 6. Vehicle VIN rows only exist to set physical_vin_relation.
+            # They share the same plate/date/location as the Plate VIN sighting,
+            # so skip the duplicate check and sighting creation entirely.
+            if record.get("vin_source") == "Vehicle VIN":
+                result["inserted"] += 1
+                continue
+
+            # 7. Duplicate check (vehicle + date + location)
             date = record.get("date") or ""
             location = record.get("location") or ""
 

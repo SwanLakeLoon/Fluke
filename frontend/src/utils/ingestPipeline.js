@@ -156,7 +156,14 @@ export async function ingestRecord(pb, record, batchLabel) {
     // Phase 2: Vehicle
     const vehicle = await findOrCreateVehicle(pb, record, vinRelationId);
 
-    // Phase 3: Sighting
+    // Phase 3: Vehicle VIN rows are only here to set physical_vin_relation.
+    // They share the same plate/date/location as the Plate VIN sighting,
+    // so skip sighting creation entirely — no duplicate queue, no new sighting.
+    if (record.vin_source === 'Vehicle VIN') {
+      return { result: 'inserted' };
+    }
+
+    // Phase 4: Sighting
     const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
 
     if (isDup) {
@@ -381,6 +388,11 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
     }
 
     // ── Sighting phase (cache-first, fallback to DB query) ─────────────────
+    // Vehicle VIN rows only update physical_vin_relation — skip sighting entirely.
+    if (record.vin_source === 'Vehicle VIN') {
+      return { result: 'inserted' };
+    }
+
     const dateStr = record.date ? record.date.substring(0, 10) : '';
     const cacheKey = `${vehicle.id}|${dateStr}|${record.location || ''}`;
 
