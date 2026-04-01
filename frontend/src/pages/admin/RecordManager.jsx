@@ -123,15 +123,23 @@ export default function RecordManager() {
 
         for (const s of sightRes) {
            const v = vehicleMap.get(s.vehicle);
-           if (v && v.vin_relation) {
+           if (!v) continue;
+           const sightingData = { 
+             ...s, 
+             _plate: v.plate, _state: v.state, _make: v.make, _model: v.model, 
+             _color: v.color, _registration: v.registration, _vehicleId: v.id 
+           };
+           // Associate sighting with VINs via both relation fields
+           if (v.vin_relation) {
               const vinObj = vinMap.get(v.vin_relation);
               if (vinObj) {
-                 vinObj.sightings.push({ 
-                   ...s, 
-                   _plate: v.plate, _state: v.state, _make: v.make, _model: v.model, 
-                   _color: v.color, _registration: v.registration, 
-                   _title_issues: vinObj.title_issues, _vehicleId: v.id 
-                 });
+                 vinObj.sightings.push({ ...sightingData, _title_issues: vinObj.title_issues });
+              }
+           }
+           if (v.physical_vin_relation && v.physical_vin_relation !== v.vin_relation) {
+              const physVinObj = vinMap.get(v.physical_vin_relation);
+              if (physVinObj) {
+                 physVinObj.sightings.push({ ...sightingData, _title_issues: physVinObj.title_issues });
               }
            }
         }

@@ -33,7 +33,7 @@ export default function Search() {
     if (filters.state)         parts.push(`state_list ~ "${esc(filters.state)}"`);
     if (filters.ice)           parts.push(`ice_list ~ "${esc(filters.ice)}"`);
     if (filters.match_status)  parts.push(`match_status_list ~ "${esc(filters.match_status)}"`);
-    if (filters.vin)           parts.push(`vin_list ~ "${esc(filters.vin)}"`);
+    if (filters.vin)           parts.push(`(vin_list ~ "${esc(filters.vin)}" || physical_vin_list ~ "${esc(filters.vin)}")`);
     if (filters.location)      parts.push(`location_list ~ "${esc(filters.location)}"`);
     if (filters.sightings)     parts.push(`sighting_count >= ${parseInt(filters.sightings, 10) || 0}`);
     return parts.join(' && ');
