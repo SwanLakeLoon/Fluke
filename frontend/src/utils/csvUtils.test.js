@@ -109,6 +109,15 @@ describe('csvUtils', () => {
       expect(result.make).toBe('Toyota');
     });
 
+    it('normalizes missing plate variations to NO PLATES', () => {
+      expect(mapRow({ 'Plate': 'No Plates' }).plate).toBe('NO PLATES');
+      expect(mapRow({ 'Plate': 'no' }).plate).toBe('NO PLATES');
+      expect(mapRow({ 'Plate': 'Missing' }).plate).toBe('NO PLATES');
+      expect(mapRow({ 'Plate': 'NONE' }).plate).toBe('NO PLATES');
+      expect(mapRow({ 'Plate': 'nothing' }).plate).toBe('NO PLATES');
+      expect(mapRow({ 'Plate': '  no plates  ' }).plate).toBe('NO PLATES');
+    });
+
     it('handles completely empty CSV row', () => {
       const result = mapRow({});
       expect(result.plate).toBe('');

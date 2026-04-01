@@ -20,6 +20,7 @@ export default function RecordManager() {
   const [filterPlate, setFilterPlate] = useState('');
   const [sortBy, setSortBy] = useState('-date');
   const [filterVehicleVinOnly, setFilterVehicleVinOnly] = useState(false);
+  const [filterNoPlates, setFilterNoPlates] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editingVehicleId, setEditingVehicleId] = useState(null);
@@ -47,6 +48,15 @@ export default function RecordManager() {
     try {
       const safePlate = filterPlate.replace(/"/g, '\\"');
       let statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
+      
+      // Filter to show only "NO PLATES" vehicles
+      if (filterNoPlates) {
+        const noPlatesClause = viewMode === 'vin'
+          ? 'plate_list ~ "NO PLATES"'
+          : 'plate = "NO PLATES"';
+        statsFilter = statsFilter ? `${statsFilter} && ${noPlatesClause}` : noPlatesClause;
+      }
+
       // Filter to show only records that have a physical (Vehicle) VIN
       if (filterVehicleVinOnly) {
         const vinOnlyClause = viewMode === 'vin'
@@ -54,6 +64,7 @@ export default function RecordManager() {
           : 'physical_vin_relation != ""';
         statsFilter = statsFilter ? `${statsFilter} && ${vinOnlyClause}` : vinOnlyClause;
       }
+      
       const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
       
       const statsRes = await pb.collection(statsCollection).getList(page, 25, {
@@ -394,6 +405,13 @@ export default function RecordManager() {
               title="Show only vehicles with a physical (dash-inspected) VIN"
             >
               🚗 Vehicle VINs only
+            </button>
+            <button
+              className={`btn btn-sm ${filterNoPlates ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => { setFilterNoPlates(v => !v); setPage(1); }}
+              title="Show only records where no plate was found"
+            >
+              ❓ No Plates
             </button>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {totalItems} total records

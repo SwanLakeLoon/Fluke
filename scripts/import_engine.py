@@ -51,6 +51,11 @@ def map_row(csv_row: dict) -> dict:
     for csv_col, db_field in COLUMN_MAP.items():
         val = csv_row.get(csv_col, "").strip()
         mapped[db_field] = val
+        
+    # Normalize missing plates
+    if mapped.get("plate", "").lower() in {"no plates", "no", "missing", "none", "nothing"}:
+        mapped["plate"] = "NO PLATES"
+
     # Also check if 'searchable' column exists in CSV
     if "searchable" in csv_row or "Searchable" in csv_row:
         raw = csv_row.get("searchable", csv_row.get("Searchable", "")).strip().upper()
