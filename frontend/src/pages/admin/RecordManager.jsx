@@ -472,7 +472,7 @@ export default function RecordManager() {
         )}
 
         {/* Table */}
-        <div className="glass-card" style={{ padding: 0, overflow: 'auto' }}>
+        <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 260px)' }}>
           <table className="data-table">
             <thead>
               <tr>

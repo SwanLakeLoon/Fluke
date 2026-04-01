@@ -233,7 +233,7 @@ export default function CsvUpload() {
               </div>
             </div>
 
-            <div className="table-wrapper glass-card" style={{ padding: 0, overflow: 'auto' }}>
+            <div className="table-wrapper glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: '500px' }}>
               <table className="data-table">
                 <thead>
                   <tr>

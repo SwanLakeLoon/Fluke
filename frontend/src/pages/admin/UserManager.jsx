@@ -149,7 +149,7 @@ export default function UserManager() {
         </div>
 
         {/* Users Table */}
-        <div className="glass-card" style={{ padding: 0, overflow: 'auto' }}>
+        <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 200px)' }}>
           <table className="data-table">
             <thead>
               <tr>
