@@ -134,6 +134,7 @@ def main():
                 {"name": "color", "type": "text", "max": 10},
                 {"name": "registration", "type": "text"},
                 {"name": "vin_relation", "type": "relation", "collectionId": "pbc_vins00000001", "maxSelect": 1},
+                {"name": "physical_vin_relation", "type": "relation", "collectionId": "pbc_vins00000001", "maxSelect": 1},
                 {"name": "searchable", "type": "bool"},
             ],
         })

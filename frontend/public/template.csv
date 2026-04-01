@@ -5,4 +5,4 @@ XYZ999,CA,Ford,F-150,WH,HS,,,1FTWW1CP3J,,Homeland Security tag,Border Checkpoint
 MNO456,MN,Chevrolet,Silverado,BK,Y,N,2022,3GCUKREC8JG123456,,VIN confirmed via plate database,Highway 35E,2024-03-10T07:20:00,92.1,Plate VIN
 MNO456,MN,Chevrolet,Silverado,BK,Y,N,2022,3GCUKREC8JG999999,,Different VIN found on dash during inspection — possible cloned plate,Highway 35E,2024-03-10T07:20:00,92.1,Vehicle VIN
 No Plates,MN,Ford,Explorer,BK,N,Y,,,,Vehicle had no front or rear plates,Downtown Plaza,2024-04-01T12:00:00,,Plate VIN
-Missing,WI,Honda,Accord,SL,Y,N,,,1HGCM82633A004352,,Plate missing entirely - dash VIN captured,West High School,2024-04-02T15:30:00,,Vehicle VIN
+Missing,WI,Honda,Accord,SL,Y,N,,1HGCM82633A004352,,Plate missing entirely - dash VIN captured,West High School,2024-04-02T15:30:00,,Vehicle VIN

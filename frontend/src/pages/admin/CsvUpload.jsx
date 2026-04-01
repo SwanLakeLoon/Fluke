@@ -58,9 +58,17 @@ export default function CsvUpload() {
   };
 
   const handleImport = async () => {
+    const validRows = preview.filter(r => r.errors.length === 0);
+
+    // Frontend check for missing location/date
+    const hasMissingData = validRows.some(r => !r.mapped.location || !r.mapped.date);
+    if (hasMissingData) {
+      const proceed = window.confirm("Reminder: Some valid records are missing a Location or Date. These fields aren't strictly required, but are highly recommended to include. Do you want to proceed with the upload anyway?");
+      if (!proceed) return;
+    }
+
     setImporting(true);
     const batchName = file.name;
-    const validRows = preview.filter(r => r.errors.length === 0);
 
     if (!isAdmin && !isApprover) {
       // --- UPLOADER/APPROVER: Stage for approval ---
