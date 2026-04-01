@@ -67,7 +67,7 @@ export default function Search() {
         } else {
           const vehicleIds = res.items.map(s => s.id);
           const vehFilterStr = vehicleIds.map(id => `id = "${id}"`).join(' || ');
-          const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr });
+          const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr, expand: 'vin_relation,physical_vin_relation' });
           
           const sightFilterStr = vehicleIds.map(id => `vehicle = "${id}"`).join(' || ');
           const sightRes = await pb.collection('sightings').getFullList({ filter: sightFilterStr, sort: '-date' });

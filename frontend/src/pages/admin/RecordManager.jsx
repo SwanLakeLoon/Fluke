@@ -47,9 +47,11 @@ export default function RecordManager() {
     try {
       const safePlate = filterPlate.replace(/"/g, '\\"');
       let statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
-      // In VIN view: optionally filter to only records that have a physical (Vehicle) VIN
-      if (viewMode === 'vin' && filterVehicleVinOnly) {
-        const vinOnlyClause = 'physical_vin_relation != ""';
+      // Filter to show only records that have a physical (Vehicle) VIN
+      if (filterVehicleVinOnly) {
+        const vinOnlyClause = viewMode === 'vin'
+          ? 'is_physical_vin = 1'
+          : 'physical_vin_relation != ""';
         statsFilter = statsFilter ? `${statsFilter} && ${vinOnlyClause}` : vinOnlyClause;
       }
       const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
@@ -376,15 +378,13 @@ export default function RecordManager() {
               <option value="-searchable">Searchable (Yes first)</option>
               <option value="searchable">Searchable (No first)</option>
             </select>
-            {viewMode === 'vin' && (
-              <button
-                className={`btn btn-sm ${filterVehicleVinOnly ? 'btn-primary' : 'btn-ghost'}`}
-                onClick={() => { setFilterVehicleVinOnly(v => !v); setPage(1); }}
-                title="Show only vehicles with a physical (dash-inspected) VIN"
-              >
-                🚗 Vehicle VINs only
-              </button>
-            )}
+            <button
+              className={`btn btn-sm ${filterVehicleVinOnly ? 'btn-primary' : 'btn-ghost'}`}
+              onClick={() => { setFilterVehicleVinOnly(v => !v); setPage(1); }}
+              title="Show only vehicles with a physical (dash-inspected) VIN"
+            >
+              🚗 Vehicle VINs only
+            </button>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {totalItems} total records
             </span>

@@ -176,13 +176,13 @@ def main():
         # 9. enhanced_plate_stats
         make_collection(c, token, names, "enhanced_plate_stats", {
             "id": "pbcplatestatsen", "name": "enhanced_plate_stats", "type": "view",
-            "viewQuery": "SELECT v.id as id, v.plate as plate, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, MAX(v.state) as state_list, GROUP_CONCAT(s.ice) as ice_list, MAX(vi.vin) as vin_list, GROUP_CONCAT(s.location) as location_list, GROUP_CONCAT(s.match_status) as match_status_list, MAX(v.searchable) as searchable FROM vehicles v LEFT JOIN sightings s ON s.vehicle = v.id LEFT JOIN vins vi ON v.vin_relation = vi.id GROUP BY v.id",
+            "viewQuery": "SELECT v.id as id, v.plate as plate, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, MAX(v.state) as state_list, GROUP_CONCAT(s.ice) as ice_list, MAX(vi.vin) as vin_list, GROUP_CONCAT(s.location) as location_list, GROUP_CONCAT(s.match_status) as match_status_list, MAX(v.searchable) as searchable, MAX(v.physical_vin_relation) as physical_vin_relation FROM vehicles v LEFT JOIN sightings s ON s.vehicle = v.id LEFT JOIN vins vi ON v.vin_relation = vi.id GROUP BY v.id",
         })
 
         # 10. enhanced_vin_stats
         make_collection(c, token, names, "enhanced_vin_stats", {
             "id": "pbcvinstatsenh", "name": "enhanced_vin_stats", "type": "view",
-            "viewQuery": "SELECT vi.id as id, vi.vin as vin, vi.title_issues as title_issues, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, GROUP_CONCAT(DISTINCT v.plate) as plate_list, MAX(v.searchable) as searchable FROM vins vi LEFT JOIN vehicles v ON v.vin_relation = vi.id LEFT JOIN sightings s ON s.vehicle = v.id GROUP BY vi.id",
+            "viewQuery": "SELECT vi.id as id, vi.vin as vin, vi.title_issues as title_issues, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, GROUP_CONCAT(DISTINCT v.plate) as plate_list, MAX(v.searchable) as searchable, MAX(CASE WHEN v.physical_vin_relation = vi.id THEN 1 ELSE 0 END) as is_physical_vin FROM vins vi LEFT JOIN vehicles v ON v.vin_relation = vi.id OR v.physical_vin_relation = vi.id LEFT JOIN sightings s ON s.vehicle = v.id GROUP BY vi.id",
         })
 
         print("\n🔧 Applying API access rules...")
