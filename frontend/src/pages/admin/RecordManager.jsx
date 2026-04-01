@@ -323,9 +323,14 @@ export default function RecordManager() {
       <div className="container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 className="admin-title" style={{ margin: 0 }}>Records Manager</h1>
-          <div className="btn-group flex gap-sm bg-base-200 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
-            <button className={`btn btn-sm ${viewMode === 'plate' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('plate'); setPage(1); }}>Plate View</button>
-            <button className={`btn btn-sm ${viewMode === 'vin' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('vin'); setPage(1); }}>VIN View</button>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.25rem' }}>
+            <div className="btn-group flex gap-sm bg-base-200 p-1" style={{ borderRadius: 'var(--radius-md)' }}>
+              <button className={`btn btn-sm ${viewMode === 'plate' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('plate'); setPage(1); }}>Plate View</button>
+              <button className={`btn btn-sm ${viewMode === 'vin' ? 'btn-primary' : 'btn-ghost'}`} onClick={() => { setViewMode('vin'); setPage(1); }}>VIN View</button>
+            </div>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              {viewMode === 'plate' ? 'sort and search by plate' : 'sort and search by vin'}
+            </span>
           </div>
         </div>
 

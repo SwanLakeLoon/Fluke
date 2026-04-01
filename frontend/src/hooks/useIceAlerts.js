@@ -20,7 +20,7 @@ export function useIceAlerts() {
     const fetchAlerts = async () => {
       try {
         const res = await pb.collection('ice_change_log').getList(1, 100, {
-          filter: 'acknowledged = false',
+          filter: 'acknowledged = false && (new_ice = "Y" || new_ice = "HS")',
           sort:   '-run_date',
         });
         setAlerts(res.items);
@@ -34,13 +34,14 @@ export function useIceAlerts() {
   }, [user, isAdmin, isApprover]);
 
   const dismiss = async () => {
+    const currentAlerts = alerts;
+    setAlerts([]); // eager dismiss UI
     try {
       await Promise.all(
-        alerts.map(a =>
+        currentAlerts.map(a =>
           pb.collection('ice_change_log').update(a.id, { acknowledged: true })
         )
       );
-      setAlerts([]);
     } catch (e) {
       console.error('[useIceAlerts] Dismiss failed:', e);
     }

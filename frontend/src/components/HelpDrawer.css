@@ -17,7 +17,7 @@
   left: 0;
   width: 360px;
   height: 100vh;
-  background: var(--surface);
+  background: var(--bg-primary);
   border-right: 1px solid var(--border);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
   z-index: 1001;
@@ -38,7 +38,7 @@
   justify-content: space-between;
   padding: 20px 24px;
   border-bottom: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--bg-primary);
 }
 
 .help-header h2 {
@@ -62,7 +62,7 @@
 }
 
 .help-section {
-  background: var(--bg);
+  background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: 8px;
   margin-bottom: 12px;
