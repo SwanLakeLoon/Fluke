@@ -36,6 +36,7 @@ COLUMN_MAP = {
     "Location":                                   "location",
     "Date":                                       "date",
     "Plate Confidence":                           "plate_confidence",
+    "VIN Source":                                 "vin_source",
 }
 
 VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR"}
@@ -56,6 +57,9 @@ def map_row(csv_row: dict) -> dict:
         mapped["_searchable_from_csv"] = raw in ("Y", "TRUE", "1", "YES")
     else:
         mapped["_searchable_from_csv"] = None  # signals: derive it
+    # VIN Source: normalize — only 'Vehicle VIN' is special, everything else defaults to 'Plate VIN'
+    vin_source_raw = mapped.get("vin_source", "").strip()
+    mapped["vin_source"] = "Vehicle VIN" if vin_source_raw == "Vehicle VIN" else "Plate VIN"
     return mapped
 
 
@@ -207,6 +211,7 @@ def process_csv_rows(
             # 5. Vehicle phase — find or create Vehicle
             plate = record["plate"]
             vehicle_id = None
+            is_physical = record.get("vin_source") == "Vehicle VIN"
 
             if plate in vehicle_cache:
                 vehicle_id = vehicle_cache[plate]
@@ -220,8 +225,15 @@ def process_csv_rows(
                     items = check.json().get("items", [])
                     if items:
                         vehicle_id = items[0]["id"]
-                        # Backfill vin_relation if missing
-                        if vin_relation_id and not items[0].get("vin_relation"):
+                        # Backfill correct VIN relation field if missing
+                        existing = items[0]
+                        if is_physical and vin_relation_id and not existing.get("physical_vin_relation"):
+                            client.patch(
+                                f"{pb_url}/api/collections/vehicles/records/{vehicle_id}",
+                                json={"physical_vin_relation": vin_relation_id},
+                                headers=headers,
+                            )
+                        elif not is_physical and vin_relation_id and not existing.get("vin_relation"):
                             client.patch(
                                 f"{pb_url}/api/collections/vehicles/records/{vehicle_id}",
                                 json={"vin_relation": vin_relation_id},
@@ -230,14 +242,15 @@ def process_csv_rows(
                     else:
                         # Create new vehicle
                         veh_data = {
-                            "plate": plate,
-                            "state": record.get("state", ""),
-                            "make": record.get("make", ""),
-                            "model": record.get("model", ""),
-                            "color": record.get("color", ""),
-                            "registration": record.get("registration", ""),
-                            "vin_relation": vin_relation_id or "",
-                            "searchable": record.get("searchable", False),
+                            "plate":                 plate,
+                            "state":                 record.get("state", ""),
+                            "make":                  record.get("make", ""),
+                            "model":                 record.get("model", ""),
+                            "color":                 record.get("color", ""),
+                            "registration":          record.get("registration", ""),
+                            "vin_relation":          "" if is_physical else (vin_relation_id or ""),
+                            "physical_vin_relation": (vin_relation_id or "") if is_physical else "",
+                            "searchable":            record.get("searchable", False),
                         }
                         resp = client.post(
                             f"{pb_url}/api/collections/vehicles/records",

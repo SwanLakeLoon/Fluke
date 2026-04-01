@@ -50,6 +50,8 @@ export async function findOrCreateVin(pb, vin, titleIssues) {
  */
 export async function findOrCreateVehicle(pb, record, vinRelationId) {
   let vehicle;
+  const isPhysical = record.vin_source === 'Vehicle VIN';
+
   try {
     vehicle = await pb
       .collection('vehicles')
@@ -58,7 +60,12 @@ export async function findOrCreateVehicle(pb, record, vinRelationId) {
     // Backfill missing fields
     const updates = {};
     if (record.searchable && !vehicle.searchable) updates.searchable = true;
-    if (vinRelationId && !vehicle.vin_relation)    updates.vin_relation = vinRelationId;
+    // Route VIN to the correct relation field based on source
+    if (isPhysical) {
+      if (vinRelationId && !vehicle.physical_vin_relation) updates.physical_vin_relation = vinRelationId;
+    } else {
+      if (vinRelationId && !vehicle.vin_relation) updates.vin_relation = vinRelationId;
+    }
     if (record.make         && !vehicle.make)         updates.make = record.make;
     if (record.model        && !vehicle.model)        updates.model = record.model;
     if (record.color        && !vehicle.color)        updates.color = record.color;
@@ -77,7 +84,8 @@ export async function findOrCreateVehicle(pb, record, vinRelationId) {
       model: record.model,
       color: record.color,
       registration: record.registration,
-      vin_relation: vinRelationId || '',
+      vin_relation:          isPhysical ? '' : (vinRelationId || ''),
+      physical_vin_relation: isPhysical ? (vinRelationId || '') : '',
       searchable: record.searchable ?? false,
     });
   }
@@ -226,6 +234,7 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
     if (vehicleCache.get(plate) === null) {
       try {
         const firstRec = records.find(r => r.plate === plate);
+        const isPhysical = firstRec.vin_source === 'Vehicle VIN';
         let vinRelationId = null;
         if (firstRec.vin) {
           const vinEntry = vinCache.get(firstRec.vin);
@@ -234,14 +243,15 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
         }
         
         const newVeh = await pb.collection('vehicles').create({
-          plate:        firstRec.plate,
-          state:        firstRec.state,
-          make:         firstRec.make,
-          model:        firstRec.model,
-          color:        firstRec.color,
-          registration: firstRec.registration,
-          vin_relation: vinRelationId || '',
-          searchable:   firstRec.searchable ?? false,
+          plate:                 firstRec.plate,
+          state:                 firstRec.state,
+          make:                  firstRec.make,
+          model:                 firstRec.model,
+          color:                 firstRec.color,
+          registration:          firstRec.registration,
+          vin_relation:          isPhysical ? '' : (vinRelationId || ''),
+          physical_vin_relation: isPhysical ? (vinRelationId || '') : '',
+          searchable:            firstRec.searchable ?? false,
         });
         vehicleCache.set(plate, newVeh);
       } catch (err) {
@@ -348,14 +358,20 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
     let vehicle = vehicleCache.get(record.plate);
     if (vehicle instanceof Error) throw vehicle;
     if (vehicle) {
+      const isPhysical = record.vin_source === 'Vehicle VIN';
       const updates = {};
-      if (record.searchable   && !vehicle.searchable)    updates.searchable = true;
-      if (vinRelationId       && !vehicle.vin_relation)   updates.vin_relation = vinRelationId;
-      if (record.make         && !vehicle.make)           updates.make = record.make;
-      if (record.model        && !vehicle.model)          updates.model = record.model;
-      if (record.color        && !vehicle.color)          updates.color = record.color;
-      if (record.state        && !vehicle.state)          updates.state = record.state;
-      if (record.registration && !vehicle.registration)   updates.registration = record.registration;
+      if (record.searchable && !vehicle.searchable) updates.searchable = true;
+      // Route VIN backfill to correct field based on source
+      if (isPhysical) {
+        if (vinRelationId && !vehicle.physical_vin_relation) updates.physical_vin_relation = vinRelationId;
+      } else {
+        if (vinRelationId && !vehicle.vin_relation) updates.vin_relation = vinRelationId;
+      }
+      if (record.make         && !vehicle.make)         updates.make = record.make;
+      if (record.model        && !vehicle.model)        updates.model = record.model;
+      if (record.color        && !vehicle.color)        updates.color = record.color;
+      if (record.state        && !vehicle.state)        updates.state = record.state;
+      if (record.registration && !vehicle.registration) updates.registration = record.registration;
       
       if (Object.keys(updates).length > 0) {
         const updatedVehicle = await pb.collection('vehicles').update(vehicle.id, updates);

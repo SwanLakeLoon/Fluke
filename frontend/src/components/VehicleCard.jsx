@@ -7,9 +7,11 @@ export default function VehicleCard({ vehicle }) {
   const colorInfo = getColorInfo(vehicle.color);
   const regNotFound = !vehicle.registration || vehicle.registration.toLowerCase().includes('not found');
 
-  // Resolve VIN from expanded relation or fallback to direct fields
-  const vinDisplay = vehicle._vin || vehicle.expand?.vin_relation?.vin || vehicle.vin || '';
-  const titleIssuesDisplay = vehicle._title_issues || vehicle.expand?.vin_relation?.title_issues || vehicle.title_issues || '';
+  // Resolve VINs from expanded relation or fallback to direct fields
+  const vinDisplay         = vehicle._vin          || vehicle.expand?.vin_relation?.vin          || vehicle.vin          || '';
+  const physVinDisplay     = vehicle._physical_vin  || vehicle.expand?.physical_vin_relation?.vin || vehicle.physical_vin || '';
+  const titleIssuesDisplay = vehicle._title_issues  || vehicle.expand?.vin_relation?.title_issues  || vehicle.title_issues || '';
+  const vinDiscrepancy     = vinDisplay && physVinDisplay && vinDisplay !== physVinDisplay;
 
   return (
     <div className="vehicle-card glass-card animate-fadeIn">
@@ -34,8 +36,19 @@ export default function VehicleCard({ vehicle }) {
           </div>
           {vinDisplay && (
             <div className="vc-detail">
-              <span className="vc-label">VIN</span>
+              <span className="vc-label">{vinDiscrepancy ? 'Plate VIN' : 'VIN'}</span>
               <span className="vc-value vc-vin">{vinDisplay}</span>
+            </div>
+          )}
+          {physVinDisplay && (
+            <div className="vc-detail">
+              <span className="vc-label">Vehicle VIN</span>
+              <span className="vc-value vc-vin">{physVinDisplay}</span>
+            </div>
+          )}
+          {vinDiscrepancy && (
+            <div className="vc-detail">
+              <span className="badge badge-warning" style={{ fontSize: '0.75rem' }}>⚠️ VIN Discrepancy</span>
             </div>
           )}
           <div className="vc-detail">

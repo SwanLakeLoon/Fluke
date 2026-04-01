@@ -13,6 +13,7 @@ export const COLUMN_MAP = {
   'Location': 'location',
   'Date': 'date',
   'Plate Confidence': 'plate_confidence',
+  'VIN Source': 'vin_source',
 };
 
 export const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR']);
@@ -105,7 +106,11 @@ export function mapRow(csvRow) {
   
   // Date Normalization
   mapped.date = parseDateString(mapped.date);
-  
+
+  // VIN Source: normalize — only 'Vehicle VIN' is special, everything else defaults to 'Plate VIN'
+  const rawVinSource = (mapped.vin_source || '').trim();
+  mapped.vin_source = rawVinSource === 'Vehicle VIN' ? 'Vehicle VIN' : 'Plate VIN';
+
   return mapped;
 }
 

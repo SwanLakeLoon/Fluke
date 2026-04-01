@@ -65,16 +65,18 @@ export default function RecordManager() {
 
       if (viewMode === 'plate') {
         const vehFilterStr = rootIds.map(id => `id = "${id}"`).join(' || ');
-        const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr, expand: 'vin_relation' });
+        const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr, expand: 'vin_relation,physical_vin_relation' });
         const sightFilterStr = rootIds.map(id => `vehicle = "${id}"`).join(' || ');
         const sightRes = await pb.collection('sightings').getFullList({ filter: sightFilterStr, sort: '-date' });
 
         const vmap = new Map();
         for (const v of vehRes) {
           const vinRec = v.expand?.vin_relation;
+          const physVinRec = v.expand?.physical_vin_relation;
           vmap.set(v.id, { 
             ...v, 
             _vin: vinRec?.vin || v.vin || '', 
+            _physical_vin: physVinRec?.vin || '',
             _title_issues: vinRec?.title_issues || v.title_issues || '', 
             sightings: [] 
           });
@@ -205,7 +207,8 @@ export default function RecordManager() {
       ice: r.ice || '',
       match_status: r.match_status || '',
       registration: (v.isVinMode ? r._registration : v.registration) || '',
-      vin: v.isVinMode ? v.vin : (v._vin || ''),
+      vin:          v.isVinMode ? v.vin :          (v._vin          || ''),
+      physical_vin: v.isVinMode ? ''   :          (v._physical_vin || ''),
       title_issues: v.isVinMode ? v.title_issues : (v._title_issues || ''),
       notes: r.notes || '',
       location: r.location || '',
@@ -221,17 +224,24 @@ export default function RecordManager() {
 
   const saveEdit = async () => {
     try {
-      // Handle VIN: find-or-create in vins collection
+      // Handle Plate VIN: find-or-create in vins collection
       let vinRelationId = null;
       if (editData.vin) {
         const vinRec = await findOrCreateVin(pb, editData.vin, editData.title_issues);
         vinRelationId = vinRec?.id || null;
       }
+      // Handle Physical VIN separately
+      let physVinRelationId = null;
+      if (editData.physical_vin) {
+        const physVinRec = await findOrCreateVin(pb, editData.physical_vin, '');
+        physVinRelationId = physVinRec?.id || null;
+      }
 
       const vData = {
         plate: editData.plate, state: editData.state, make: editData.make,
         model: editData.model, color: editData.color, registration: editData.registration,
-        vin_relation: vinRelationId || '',
+        vin_relation:          vinRelationId     || '',
+        physical_vin_relation: physVinRelationId || '',
       };
       const sData = {
         location: editData.location, date: editData.date, ice: editData.ice,
@@ -466,6 +476,9 @@ export default function RecordManager() {
                     </td>
                     <td>
                       <div><strong>{v.isVinMode ? (v.vin || 'Unknown VIN') : v.plate}</strong></div>
+                      {!v.isVinMode && v._physical_vin && v._physical_vin !== v._vin && (
+                        <span className="badge badge-warning" style={{ fontSize: '0.7rem', marginTop: '4px' }}>⚠️ VIN Discrepancy</span>
+                      )}
                       {!v.isVinMode && v.sightings.length > 1 && (
                         <div style={{ marginTop: '4px' }}>
                           <span className="badge badge-warning" style={{ fontSize: '0.7rem' }}>
@@ -557,7 +570,8 @@ export default function RecordManager() {
                               <label>Location<input className="input input-sm" value={editData.location} onChange={e => updateEditField('location', e.target.value)} /></label>
                               <label>Date<input className="input input-sm" value={editData.date} onChange={e => updateEditField('date', e.target.value)} /></label>
                               <label>Registration<input className="input input-sm" value={editData.registration} onChange={e => updateEditField('registration', e.target.value)} /></label>
-                              <label>VIN<input className="input input-sm" value={editData.vin} onChange={e => updateEditField('vin', e.target.value)} /></label>
+                              <label>VIN (Plate)<input className="input input-sm" value={editData.vin} onChange={e => updateEditField('vin', e.target.value)} /></label>
+                              <label>VIN (Vehicle / Physical)<input className="input input-sm" value={editData.physical_vin} onChange={e => updateEditField('physical_vin', e.target.value)} placeholder="Leave blank if same as Plate VIN" /></label>
                               <label>Notes<input className="input input-sm" value={editData.notes} onChange={e => updateEditField('notes', e.target.value)} /></label>
                             </div>
                             <div className="edit-actions">
