@@ -96,8 +96,10 @@ export default function RecordManager() {
         const grouped = statsRes.items.map(s => vmap.get(s.id)).filter(Boolean);
         setRecords(grouped);
       } else {
-        // VIN Mode
-        const vehFilterStr = rootIds.map(id => `vin_relation = "${id}"`).join(' || ');
+        // VIN Mode — match vehicles linked via either relation field
+        const vehFilterStr = rootIds
+          .map(id => `vin_relation = "${id}" || physical_vin_relation = "${id}"`)
+          .join(' || ');
         const vehRes = await pb.collection('vehicles').getFullList({ filter: vehFilterStr });
         
         const vehicleMap = new Map();
