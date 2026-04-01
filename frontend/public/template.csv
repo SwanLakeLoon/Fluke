@@ -1,4 +1,6 @@
-Plate,State,Make,Model,Color,ICE,Match,Registration,VIN Associated to Plate (if available),Title Issues Associated to VIN (if available),Notes,Location,Date,Plate Confidence
-ABC1234,TX,Toyota,Camry,SL,N,Y,2024,1YV1234567890ABCDE,,Spotted near intersection,Main St Camera,2023-10-15T08:30:00,95.5
-DEF567,MN,Honda,Civic,BL,Y,N,2023,,,Known suspect vehicle,North Garage,2023-10-16T14:45:00,88
-XYZ999,CA,Ford,F-150,WH,HS,,,1FTWW1CP3J,,Homeland Security tag,Border Checkpoint 2,2023-11-01T09:15:00,99.2
+Plate,State,Make,Model,Color,ICE,Match,Registration,VIN Associated to Plate (if available),Title Issues Associated to VIN (if available),Notes,Location,Date,Plate Confidence,VIN Source
+ABC1234,TX,Toyota,Camry,SL,N,Y,2024,1YV1234567890ABCDE,,Spotted near intersection,Main St Camera,2023-10-15T08:30:00,95.5,Plate VIN
+DEF567,MN,Honda,Civic,BL,Y,N,2023,,,Known suspect vehicle,North Garage,2023-10-16T14:45:00,88,
+XYZ999,CA,Ford,F-150,WH,HS,,,1FTWW1CP3J,,Homeland Security tag,Border Checkpoint 2,2023-11-01T09:15:00,99.2,Plate VIN
+MNO456,MN,Chevrolet,Silverado,BK,Y,N,2022,3GCUKREC8JG123456,,VIN confirmed via plate database,Highway 35E,2024-03-10T07:20:00,92.1,Plate VIN
+MNO456,MN,Chevrolet,Silverado,BK,Y,N,2022,3GCUKREC8JG999999,,Different VIN found on dash during inspection — possible cloned plate,Highway 35E,2024-03-10T07:20:00,92.1,Vehicle VIN
