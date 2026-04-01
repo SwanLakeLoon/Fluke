@@ -47,6 +47,16 @@
 
 .table-wrapper { margin-bottom: var(--space-lg); }
 
+/* Sticky table headers */
+.table-wrapper thead th,
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-primary);
+  z-index: 10;
+  box-shadow: 0 1px 0 var(--border);
+}
+
 .row-error td { background: rgba(248, 113, 113, 0.05); }
 
 /* Import Result */
