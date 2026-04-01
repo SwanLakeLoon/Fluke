@@ -19,6 +19,7 @@ export default function RecordManager() {
   const [selected, setSelected] = useState(new Set());
   const [filterPlate, setFilterPlate] = useState('');
   const [sortBy, setSortBy] = useState('-date');
+  const [filterVehicleVinOnly, setFilterVehicleVinOnly] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editingVehicleId, setEditingVehicleId] = useState(null);
@@ -45,7 +46,12 @@ export default function RecordManager() {
     setLoading(true);
     try {
       const safePlate = filterPlate.replace(/"/g, '\\"');
-      const statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
+      let statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
+      // In VIN view: optionally filter to only records that have a physical (Vehicle) VIN
+      if (viewMode === 'vin' && filterVehicleVinOnly) {
+        const vinOnlyClause = 'physical_vin_relation != ""';
+        statsFilter = statsFilter ? `${statsFilter} && ${vinOnlyClause}` : vinOnlyClause;
+      }
       const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
       
       const statsRes = await pb.collection(statsCollection).getList(page, 25, {
@@ -136,7 +142,7 @@ export default function RecordManager() {
   };
 
   // eslint-disable-next-line
-  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode]);
+  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode, filterVehicleVinOnly]);
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -349,7 +355,7 @@ export default function RecordManager() {
           <div className="records-toolbar-left">
             <input
               className="input"
-              placeholder="Filter by plate..."
+              placeholder={viewMode === 'vin' ? 'Filter by VIN...' : 'Filter by plate...'}
               value={filterPlate}
               onChange={(e) => { setFilterPlate(e.target.value); setPage(1); }}
               style={{ maxWidth: 200 }}
@@ -363,13 +369,22 @@ export default function RecordManager() {
               <option value="date">Sighting Date (Oldest)</option>
               <option value="-sightings">Sightings (Most)</option>
               <option value="sightings">Sightings (Least)</option>
-              <option value="plate">Plate (A-Z)</option>
-              <option value="-plate">Plate (Z-A)</option>
+              {viewMode === 'plate' && <option value="plate">Plate (A-Z)</option>}
+              {viewMode === 'plate' && <option value="-plate">Plate (Z-A)</option>}
               <option value="location">Location (A-Z)</option>
               <option value="-location">Location (Z-A)</option>
               <option value="-searchable">Searchable (Yes first)</option>
               <option value="searchable">Searchable (No first)</option>
             </select>
+            {viewMode === 'vin' && (
+              <button
+                className={`btn btn-sm ${filterVehicleVinOnly ? 'btn-primary' : 'btn-ghost'}`}
+                onClick={() => { setFilterVehicleVinOnly(v => !v); setPage(1); }}
+                title="Show only vehicles with a physical (dash-inspected) VIN"
+              >
+                🚗 Vehicle VINs only
+              </button>
+            )}
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {totalItems} total records
             </span>
@@ -570,8 +585,26 @@ export default function RecordManager() {
                               <label>Location<input className="input input-sm" value={editData.location} onChange={e => updateEditField('location', e.target.value)} /></label>
                               <label>Date<input className="input input-sm" value={editData.date} onChange={e => updateEditField('date', e.target.value)} /></label>
                               <label>Registration<input className="input input-sm" value={editData.registration} onChange={e => updateEditField('registration', e.target.value)} /></label>
-                              <label>VIN (Plate)<input className="input input-sm" value={editData.vin} onChange={e => updateEditField('vin', e.target.value)} /></label>
-                              <label>VIN (Vehicle / Physical)<input className="input input-sm" value={editData.physical_vin} onChange={e => updateEditField('physical_vin', e.target.value)} placeholder="Leave blank if same as Plate VIN" /></label>
+                              <label>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  VIN (Plate)
+                                  <span
+                                    title="The VIN returned by a license plate lookup (e.g. PlateToVin database). This is the VIN associated with the registered owner of the plate."
+                                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1rem', height: '1rem', borderRadius: '50%', background: 'var(--text-muted)', color: 'var(--bg-primary)', fontSize: '0.65rem', fontWeight: 700, cursor: 'help', flexShrink: 0 }}
+                                  >?</span>
+                                </span>
+                                <input className="input input-sm" value={editData.vin} onChange={e => updateEditField('vin', e.target.value)} />
+                              </label>
+                              <label>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                                  VIN (Vehicle / Physical)
+                                  <span
+                                    title="The VIN physically observed on the vehicle's dashboard or door jamb during an in-person inspection. Use this when the dash VIN differs from the plate lookup result — a common sign of a cloned or stolen plate."
+                                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '1rem', height: '1rem', borderRadius: '50%', background: 'var(--text-muted)', color: 'var(--bg-primary)', fontSize: '0.65rem', fontWeight: 700, cursor: 'help', flexShrink: 0 }}
+                                  >?</span>
+                                </span>
+                                <input className="input input-sm" value={editData.physical_vin} onChange={e => updateEditField('physical_vin', e.target.value)} placeholder="Leave blank if same as Plate VIN" />
+                              </label>
                               <label>Notes<input className="input input-sm" value={editData.notes} onChange={e => updateEditField('notes', e.target.value)} /></label>
                             </div>
                             <div className="edit-actions">
