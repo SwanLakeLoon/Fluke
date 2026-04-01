@@ -126,5 +126,24 @@ describe('csvUtils', () => {
       expect(result.vin).toBe('1HGCM82633A004352');
       expect(result.title_issues).toBe('Salvage title');
     });
+
+    it('defaults vin_source to Plate VIN if missing, blank, or invalid', () => {
+      // Missing column entirely
+      expect(mapRow({}).vin_source).toBe('Plate VIN');
+      
+      // Blank or whitespace
+      expect(mapRow({ 'VIN Source': '' }).vin_source).toBe('Plate VIN');
+      expect(mapRow({ 'VIN Source': '   ' }).vin_source).toBe('Plate VIN');
+      
+      // Invalid or unrecognized string
+      expect(mapRow({ 'VIN Source': 'N/A' }).vin_source).toBe('Plate VIN');
+      expect(mapRow({ 'VIN Source': 'Unknown' }).vin_source).toBe('Plate VIN');
+    });
+
+    it('maps Vehicle VIN correctly when specified', () => {
+      expect(mapRow({ 'VIN Source': 'Vehicle VIN' }).vin_source).toBe('Vehicle VIN');
+      // Case-insensitive header match, but the value must be exact
+      expect(mapRow({ 'vin source': 'Vehicle VIN' }).vin_source).toBe('Vehicle VIN');
+    });
   });
 });
