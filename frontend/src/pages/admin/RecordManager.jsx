@@ -26,6 +26,7 @@ export default function RecordManager() {
   const [editingVehicleId, setEditingVehicleId] = useState(null);
   const [editData, setEditData] = useState({});
   const [confirmDelete, setConfirmDelete] = useState(null); // 'single:id' or 'bulk'
+  const [exporting, setExporting] = useState(false);
 
   const getStatsSort = (sb) => {
     switch (sb) {
@@ -165,7 +166,119 @@ export default function RecordManager() {
   };
 
   // eslint-disable-next-line
-  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode, filterVehicleVinOnly]);
+  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode, filterVehicleVinOnly, filterNoPlates]); // eslint-disable-line
+
+  const exportCSV = async () => {
+    setExporting(true);
+    try {
+      const safePlate = filterPlate.replace(/"/g, '\\"');
+      let statsFilter = safePlate
+        ? (viewMode === 'vin'
+          ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"`
+          : `plate ~ "${safePlate}"`)
+        : '';
+      if (filterNoPlates) {
+        const clause = viewMode === 'vin' ? 'plate_list ~ "NO PLATES"' : 'plate = "NO PLATES"';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
+      }
+      if (filterVehicleVinOnly) {
+        const clause = viewMode === 'vin' ? 'is_physical_vin = 1' : 'physical_vin_relation != ""';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
+      }
+
+      const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
+      const allStats = await pb.collection(statsCollection).getFullList({
+        filter: statsFilter || undefined,
+        sort: getStatsSort(sortBy),
+      });
+
+      let headers = [];
+      let rows = [];
+
+      const csvEscape = (val) => {
+        const s = String(val ?? '');
+        return (s.includes(',') || s.includes('"') || s.includes('\n'))
+          ? `"${s.replace(/"/g, '""')}"`
+          : s;
+      };
+
+      if (viewMode === 'plate') {
+        headers = ['plate','state','make','model','color','registration','vin','physical_vin','title_issues','ice','match_status','location','date','searchable','notes'];
+        if (allStats.length > 0) {
+          const rootIds = allStats.map(s => s.id);
+          const vehFilterStr = rootIds.map(id => `id = "${id}"`).join(' || ');
+          const vehRes = await pb.collection('vehicles').getFullList({
+            filter: vehFilterStr,
+            expand: 'vin_relation,physical_vin_relation',
+          });
+          const sightFilterStr = rootIds.map(id => `vehicle = "${id}"`).join(' || ');
+          const sightRes = await pb.collection('sightings').getFullList({
+            filter: sightFilterStr,
+            sort: '-date',
+          });
+
+          const vmap = new Map();
+          for (const v of vehRes) {
+            const vinRec = v.expand?.vin_relation;
+            const physVinRec = v.expand?.physical_vin_relation;
+            vmap.set(v.id, {
+              ...v,
+              _vin: vinRec?.vin || v.vin || '',
+              _physical_vin: physVinRec?.vin || '',
+              _title_issues: vinRec?.title_issues || v.title_issues || '',
+              sightings: [],
+            });
+          }
+          for (const s of sightRes) {
+            if (vmap.has(s.vehicle)) vmap.get(s.vehicle).sightings.push(s);
+          }
+          // Emit one row per sighting, preserving stats sort order
+          for (const stat of allStats) {
+            const v = vmap.get(stat.id);
+            if (!v) continue;
+            for (const s of v.sightings) {
+              rows.push([
+                v.plate, v.state, v.make, v.model, v.color, v.registration,
+                v._vin, v._physical_vin, v._title_issues,
+                s.ice, s.match_status, s.location,
+                s.date ? new Date(s.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '',
+                v.searchable ? 'true' : 'false',
+                s.notes || '',
+              ]);
+            }
+          }
+        }
+      } else {
+        // VIN view — one row per VIN with aggregated stats
+        headers = ['vin','title_issues','plates','sighting_count','latest_sighting','searchable'];
+        for (const v of allStats) {
+          rows.push([
+            v.vin || '',
+            v.title_issues || '',
+            v.plate_list || '',
+            v.sighting_count ?? '',
+            v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '',
+            v.searchable ? 'true' : 'false',
+          ]);
+        }
+      }
+
+      const csvContent = [headers, ...rows].map(r => r.map(csvEscape).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fluke-records-${viewMode}-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error('Export failed:', e);
+      alert('Export failed: ' + e.message);
+    }
+    setExporting(false);
+  };
 
   const toggleSelect = (id) => {
     setSelected(prev => {
@@ -416,6 +529,16 @@ export default function RecordManager() {
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {totalItems} total records
             </span>
+            <button
+              id="records-export-csv"
+              className="btn btn-ghost btn-sm"
+              onClick={exportCSV}
+              disabled={exporting || loading || totalItems === 0}
+              title={`Export all ${totalItems} matching records as CSV`}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+            >
+              {exporting ? '⏳ Exporting...' : '⬇️ Export CSV'}
+            </button>
           </div>
           {selected.size > 0 && (
             <div className="flex gap-sm">

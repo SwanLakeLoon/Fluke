@@ -128,6 +128,7 @@ export default function HelpDrawer({ isOpen, onClose }) {
                     <li>Browse all records, including hidden/non-searchable ones.</li>
                     <li>Inline-edit any field by clicking on it directly in the table row.</li>
                     <li>Toggle the <strong>Searchable</strong> switch to control whether a record appears in the public search.</li>
+                    <li><strong>⬇️ Export CSV:</strong> Downloads a CSV of <em>all</em> records matching the current filters and sort — not just the current page. Works in both Plate and VIN view.</li>
                   </ul>
                 </div>
               </details>
