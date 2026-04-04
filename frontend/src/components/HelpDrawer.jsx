@@ -87,27 +87,28 @@ export default function HelpDrawer({ isOpen, onClose }) {
           {isApprover && (
             <>
               <details className="help-section">
-                <summary>✅ Approval Queue</summary>
+                <summary>📥 Queues</summary>
                 <div className="help-section-content">
-                  <ul>
+                  <p style={{ marginBottom: '0.75rem' }}>
+                    The <strong>Queues</strong> page combines two review workflows in one place.
+                    Use the toggle at the top of the page to switch between them.
+                  </p>
+
+                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>✅ Approvals</div>
+                  <ul style={{ marginBottom: '1rem' }}>
                     <li>Batches uploaded by non-admin users appear here awaiting review.</li>
                     <li>Click a batch to see a preview of all rows before deciding.</li>
                     <li><strong>Approve:</strong> Runs the batch through the ingestion pipeline (with duplicate detection).</li>
                     <li><strong>Reject:</strong> Discards the entire batch — no records are ingested.</li>
                   </ul>
-                </div>
-              </details>
 
-              <details className="help-section">
-                <summary>🔄 Duplicate Review</summary>
-                <div className="help-section-content">
-                  <p style={{marginBottom: '0.5rem'}}>
+                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>🔄 Duplicates</div>
+                  <p style={{ marginBottom: '0.5rem' }}>
                     Populated when an incoming row matches the exact <strong>Plate + Date + Location</strong> of an existing database record.
-                    <br/><br/>
-                    <strong>Note:</strong> Records are not officially ingested into the database until the duplicate conflict is resolved.
+                    Records are <strong>not</strong> ingested until the conflict is resolved.
                   </p>
                   <div className="help-actions-list">
-                    <div style={{fontWeight: 600, color: 'var(--text-primary)'}}>Options for conflict resolution are:</div>
+                    <div style={{ fontWeight: 600, color: 'var(--text-primary)' }}>Options for conflict resolution:</div>
                     <div><strong>➕ Keep Both:</strong> Inserts incoming as a new separate row.</div>
                     <div><strong>🔄 Replace Existing:</strong> Overwrites existing record with new data.</div>
                     <div><strong>🚫 Reject Incoming:</strong> Discards incoming; database remains unchanged.</div>
@@ -142,7 +143,7 @@ export default function HelpDrawer({ isOpen, onClose }) {
                   <div className="help-actions-list">
                     <div><strong>user:</strong> Search only</div>
                     <div><strong>uploader:</strong> Search + Upload CSV (staged for approval)</div>
-                    <div><strong>approver:</strong> All of uploader + Approval Queue + Duplicate Review</div>
+                    <div><strong>approver:</strong> All of uploader + Queues (Approvals &amp; Duplicates)</div>
                     <div><strong>admin:</strong> Full access: direct ingest, approve, records, users</div>
                   </div>
                 </div>

@@ -3,7 +3,7 @@ import { pb } from '../../api/client';
 import { findOrCreateVin } from '../../utils/ingestPipeline';
 import './AdminPages.css';
 
-export default function DuplicateReview() {
+export default function DuplicateReview({ embedded = false }) {
   const [dupes, setDupes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -198,11 +198,8 @@ export default function DuplicateReview() {
     );
   };
 
-  return (
-    <div className="page">
-      <div className="container" style={{ maxWidth: '1000px' }}>
-        <h1 className="admin-title">Duplicate Conflict Resolution</h1>
-        
+  const inner = (
+    <>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)', fontSize: '0.95rem', maxWidth: '800px', lineHeight: 1.5 }}>
           When importing CSV batches, incoming records that match the exact Plate, Date, and Location of an existing 
           database entry are held in this queue. They are <strong>not</strong> officially ingested into the database 
@@ -298,6 +295,15 @@ export default function DuplicateReview() {
             </div>
           );
         })}
+    </>
+  );
+
+  if (embedded) return inner;
+  return (
+    <div className="page">
+      <div className="container" style={{ maxWidth: '1000px' }}>
+        <h1 className="admin-title">Duplicate Conflict Resolution</h1>
+        {inner}
       </div>
     </div>
   );

@@ -41,20 +41,12 @@ export default function Navbar() {
             </NavLink>
           )}
           {isApprover && (
-            <>
-              <NavLink
-                to="/approval"
-                className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
-              >
-                Approval Queue
-              </NavLink>
-              <NavLink
-                to="/duplicates"
-                className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
-              >
-                Duplicates
-              </NavLink>
-            </>
+            <NavLink
+              to="/queues"
+              className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
+            >
+              Queues
+            </NavLink>
           )}
           {isAdmin && (
             <>

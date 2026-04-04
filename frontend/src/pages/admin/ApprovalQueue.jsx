@@ -3,7 +3,7 @@ import { pb } from '../../api/client';
 import { processBatch } from '../../utils/ingestPipeline';
 import './AdminPages.css';
 
-export default function ApprovalQueue() {
+export default function ApprovalQueue({ embedded = false }) {
   const [batches, setBatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState(null);
@@ -117,14 +117,11 @@ export default function ApprovalQueue() {
     return new Date(iso).toLocaleString();
   };
 
-  return (
-    <div className="page">
-      <div className="container" style={{ maxWidth: '1100px' }}>
-        <h1 className="admin-title">Approval Queue</h1>
-
+  const inner = (
+    <>
         <p style={{ color: 'var(--text-secondary)', marginBottom: 'var(--space-lg)', fontSize: '0.95rem', maxWidth: '800px', lineHeight: 1.5 }}>
           CSV batches uploaded by non-admin users are held here for review.
-          Approve a batch to run it through the standard ingestion pipeline (with duplicate detection), 
+          Approve a batch to run it through the standard ingestion pipeline (with duplicate detection),
           or reject it to discard entirely.
         </p>
 
@@ -252,6 +249,15 @@ export default function ApprovalQueue() {
             )}
           </div>
         ))}
+    </>
+  );
+
+  if (embedded) return inner;
+  return (
+    <div className="page">
+      <div className="container" style={{ maxWidth: '1100px' }}>
+        <h1 className="admin-title">Approval Queue</h1>
+        {inner}
       </div>
     </div>
   );
