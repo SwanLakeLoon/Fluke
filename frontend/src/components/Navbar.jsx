@@ -62,6 +62,12 @@ export default function Navbar() {
               >
                 Users
               </NavLink>
+              <NavLink
+                to="/admin/locations"
+                className={({ isActive }) => `navbar-link ${isActive ? 'active' : ''}`}
+              >
+                Locations
+              </NavLink>
             </>
           )}
           <div style={{ width: '1px', height: '20px', background: 'var(--border)', margin: '0 var(--space-xs)' }}></div>

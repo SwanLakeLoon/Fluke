@@ -186,6 +186,22 @@ def main():
             "viewQuery": "SELECT vi.id as id, vi.vin as vin, vi.title_issues as title_issues, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, GROUP_CONCAT(DISTINCT v.plate) as plate_list, MAX(v.searchable) as searchable, MAX(CASE WHEN v.physical_vin_relation = vi.id THEN 1 ELSE 0 END) as is_physical_vin FROM vins vi LEFT JOIN vehicles v ON v.vin_relation = vi.id OR v.physical_vin_relation = vi.id LEFT JOIN sightings s ON s.vehicle = v.id GROUP BY vi.id",
         })
 
+        # 11. location_aliases
+        make_collection(c, token, names, "location_aliases", {
+            "name": "location_aliases", "type": "base",
+            "indexes": ["CREATE UNIQUE INDEX idx_location_aliases_location ON location_aliases (location)"],
+            "fields": [
+                {"name": "location", "type": "text", "required": True, "presentable": True},
+                {"name": "alias", "type": "select", "required": True, "values": ["Known ICE HOTEL", "Known ICE Business Suite"], "maxSelect": 1},
+            ],
+        })
+
+        # 12. location_stats
+        make_collection(c, token, names, "location_stats", {
+            "name": "location_stats", "type": "view",
+            "viewQuery": "SELECT (ROW_NUMBER() OVER()) as id, location, COUNT(*) as sighting_count FROM sightings WHERE location != '' GROUP BY location",
+        })
+
         print("\n🔧 Applying API access rules...")
         
         # Fresh collection snapshot for rule mapping
@@ -233,6 +249,19 @@ def main():
             "createRule": '@request.auth.role ?= "uploader" || @request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
             "updateRule": '@request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
             "deleteRule": '@request.auth.role ?= "admin"'
+        })
+
+        admin_only_rule = '@request.auth.role ?= "admin"'
+        safe_patch("location_aliases", {
+            "listRule": '@request.auth.id != ""',   # Any authed user can READ (required for redaction to work)
+            "viewRule": '@request.auth.id != ""',
+            "createRule": admin_only_rule,
+            "updateRule": admin_only_rule,
+            "deleteRule": admin_only_rule
+        })
+
+        safe_patch("location_stats", {
+            "listRule": admin_only_rule, "viewRule": admin_only_rule
         })
 
         if users_col:

@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useTheme } from './hooks/useTheme';
 import { useIceAlerts } from './hooks/useIceAlerts';
 import Navbar from './components/Navbar';
+import { LocationAliasProvider } from './context/LocationAliasContext';
 import Login from './pages/Login';
 import Search from './pages/Search';
 import CsvUpload from './pages/admin/CsvUpload';
@@ -11,6 +12,7 @@ import ApprovalQueue from './pages/admin/ApprovalQueue';
 import Queues from './pages/admin/Queues';
 import RecordManager from './pages/admin/RecordManager';
 import UserManager from './pages/admin/UserManager';
+import Locations from './pages/admin/Locations';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -125,6 +127,7 @@ function AppRoutes() {
         <Route path="/duplicates" element={<Navigate to="/queues?tab=duplicates" replace />} />
         <Route path="/admin/records" element={<AdminRoute><RecordManager /></AdminRoute>} />
         <Route path="/admin/users" element={<AdminRoute><UserManager /></AdminRoute>} />
+        <Route path="/admin/locations" element={<AdminRoute><Locations /></AdminRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
@@ -135,7 +138,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppRoutes />
+        <LocationAliasProvider>
+          <AppRoutes />
+        </LocationAliasProvider>
       </AuthProvider>
     </BrowserRouter>
   );

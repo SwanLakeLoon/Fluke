@@ -1,9 +1,11 @@
 import { getColorInfo } from '../utils/colorMap';
 import { useState } from 'react';
+import { useLocationAliases } from '../context/LocationAliasContext';
 import './VehicleCard.css';
 
 export default function VehicleCard({ vehicle }) {
   const [expanded, setExpanded] = useState(vehicle.sightings.length <= 3);
+  const { redactLocation } = useLocationAliases();
   const colorInfo = getColorInfo(vehicle.color);
   const regNotFound = !vehicle.registration || vehicle.registration.toLowerCase().includes('not found');
 
@@ -83,7 +85,7 @@ export default function VehicleCard({ vehicle }) {
             {vehicle.sightings.map((s, i) => (
               <div key={s.id || i} className="vc-sighting">
                 <div className="vc-sighting-header">
-                  <span className="vc-sighting-location">{s.location || 'Unknown location'}</span>
+                  <span className="vc-sighting-location">{redactLocation(s.location) || 'Unknown location'}</span>
                   <span className="vc-sighting-date">
                     {s.date ? new Date(s.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : 'No date'}
                   </span>

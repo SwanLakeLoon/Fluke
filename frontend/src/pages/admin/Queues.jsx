@@ -23,7 +23,7 @@ export default function Queues() {
     const next = new URLSearchParams(location.search);
     next.set('tab', activeTab);
     navigate({ search: next.toString() }, { replace: true });
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab, navigate]);
 
   return (
     <div className="page">
