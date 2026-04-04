@@ -154,8 +154,13 @@ def pb_log_change(client: httpx.Client, token: str, plate: str, old_ice: str, ne
 
 async def lookup_ice_async(client: httpx.AsyncClient, sem: asyncio.Semaphore, plate: str) -> str | None:
     """
-    Query defrostmn.net for a plate. Returns 'Y', 'HS', 'N', or None on error.
-    None means "skip — do not overwrite existing value".
+    Query defrostmn.net for a plate.
+    Returns 'Y', 'HS', 'N', 'C', or None on error.
+      - 'Y'  = Confirmed ICE
+      - 'HS' = Highly suspected ICE
+      - 'C'  = Cleared (previously flagged, now removed)
+      - 'N'  = Not listed
+      - None = lookup failed — do not overwrite existing value
     """
     clean = plate.replace(" ", "").replace("-", "").upper()
     params = urllib.parse.urlencode({"q": clean, "password": DEFROST_PASS})
@@ -171,10 +176,13 @@ async def lookup_ice_async(client: httpx.AsyncClient, sem: asyncio.Semaphore, pl
             if not exact:
                 return "N"
             status = (exact[0].get("status") or "").strip()
-            if status == "Confirmed ICE":
+            status_upper = status.upper()
+            if status_upper in ("CONFIRMED ICE", "CONFIRMED"):
                 return "Y"
-            elif status == "Highly suspected ICE":
+            elif "HIGHLY SUSPECTED" in status_upper:
                 return "HS"
+            elif status_upper.startswith("CLEARED"):
+                return "C"
             else:
                 return "N"
         except Exception as e:
@@ -234,14 +242,21 @@ async def run():
                     if new_ice == old_ice:
                         continue  # No change — most common case
 
-                    print(f"  📋 {plate}: {old_ice} → {new_ice}")
+                    # Determine change direction for display and logging
+                    is_escalation = new_ice in ("Y", "HS")
+                    is_clearance  = new_ice == "C"
+                    icon = "🔴" if is_escalation else ("⬜" if is_clearance else "📋")
+                    print(f"  {icon} {plate}: {old_ice} → {new_ice}")
                     changed += 1
 
                     if not DRY_RUN:
                         try:
                             n = pb_update_all_sightings(pb, token, vid, new_ice)
                             pb_update_vehicle_searchable(pb, token, vid, new_ice)
-                            pb_log_change(pb, token, plate, old_ice, new_ice, n)
+                            # Only log escalations (Y/HS) to ice_change_log — these
+                            # trigger the admin modal. Clearances are applied silently.
+                            if is_escalation:
+                                pb_log_change(pb, token, plate, old_ice, new_ice, n)
                         except Exception as e:
                             print(f"    ❌ Write failed for {plate}: {e}")
                             errors += 1

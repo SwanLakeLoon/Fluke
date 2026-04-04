@@ -18,15 +18,32 @@ A web application for searching, importing, and managing ALPR (Automated License
 - Node.js (v18+)
 - Python 3.10+ and `uv` package manager
 
-### 2. Start PocketBase (Backend)
+### 2. Download PocketBase
+Since the `pocketbase` binary isn't tracked in version control, it must be downloaded manually for a fresh local deployment.
+1. Download **PocketBase v0.25+** for your system architecture from the [PocketBase Releases page](https://github.com/pocketbase/pocketbase/releases).
+2. Extract the `pocketbase` binary and place it inside the `./backend/` directory.
+
+### 3. Initialize the Backend Database
+Before starting the frontend, you must initialize the local database schema and create a default superuser.
+
 ```bash
-# From the project root
+# From the project root, create the local superuser (initializes pb_data)
+./backend/pocketbase superuser upsert admin@local.dev admin123456
+
+# Start PocketBase (keep it running in this terminal)
 ./backend/pocketbase serve
 ```
-PocketBase will run on `http://127.0.0.1:8090`. 
-*(Note: Default superuser is `admin@local.dev` / `admin123456` if using the pre-seeded SQLite db).*
+PocketBase will run on `http://127.0.0.1:8090`.
 
-### 3. Start React (Frontend)
+Once PocketBase is running, open a **new terminal tab** and run the unified schema script to populate collections, API rules, and SQL views:
+```bash
+POCKETBASE_URL=http://127.0.0.1:8090 \
+PB_ADMIN_EMAIL=admin@local.dev \
+PB_ADMIN_PASS=admin123456 \
+uv run scripts/setup-schema.py
+```
+
+### 4. Start React (Frontend)
 ```bash
 cd frontend
 npm install
@@ -34,7 +51,7 @@ npm run dev
 ```
 The frontend will run on `http://localhost:5173`.
 
-### 4. CLI Scripts
+### 5. CLI Scripts
 Admin scripts use Python and `uv`.
 | Script | Purpose |
 |---|---|
@@ -181,8 +198,18 @@ Fluke runs a nightly job that re-checks every known plate against the `defrostmn
 1. GitHub Actions triggers at **4:00 AM CST** (`0 10 * * *` UTC) every night
 2. `scripts/ice_refresh.py` fetches all plates from PocketBase
 3. Each plate is checked against `defrostmn.net/plates/lookup`
-4. Changed plates → all sightings updated, vehicle `searchable` flag updated, change logged to `ice_change_log`
-5. On next admin login → dismissible notification banner
+4. The defrost status is normalized to one of four values:
+
+   | Defrost status string | Written to DB | `searchable` | Admin modal |
+   |---|---|---|---|
+   | `Confirmed ICE` / `CONFIRMED` | `Y` | `true` | ✅ Yes |
+   | `Highly suspected ICE` | `HS` | `true` | ✅ Yes |
+   | `Cleared - NOT ICE` (any `Cleared…` prefix) | `C` | `false` | ❌ Silent |
+   | Anything else / not found | `N` | `false` | ❌ Silent |
+
+5. **Escalations** (`Y` / `HS`): all sightings updated, vehicle `searchable` set to `true`, change logged to `ice_change_log`
+6. **Clearances** (`C`): all sightings updated, vehicle `searchable` set to `false`, **no** `ice_change_log` entry (no modal)
+7. On next admin login → dismissible notification banner for escalations only
 
 ### One-time Setup (Human — do once)
 

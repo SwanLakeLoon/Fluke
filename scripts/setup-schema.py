@@ -199,10 +199,20 @@ def main():
                 print(f"  ✅ {colName} rules updated")
 
         for c_name in ["vins", "vehicles", "sightings", "plate_stats", "enhanced_plate_stats", "enhanced_vin_stats"]:
+            if c_name in ["vehicles", "enhanced_plate_stats", "enhanced_vin_stats"]:
+                list_view = '(@request.auth.id != "" && searchable = true) || @request.auth.role ?= "admin"'
+            elif c_name == "sightings":
+                list_view = '(@request.auth.id != "" && vehicle.searchable = true) || @request.auth.role ?= "admin"'
+            else:
+                list_view = '(@request.auth.id != "") || @request.auth.role ?= "admin"'
+                
+            is_view = c_name in ["plate_stats", "enhanced_plate_stats", "enhanced_vin_stats"]
+            cu_rule = None if is_view else '@request.auth.role ?= "admin" || @request.auth.role ?= "approver"'
+            
             safe_patch(c_name, {
-                "listRule": ADMIN_RULE, "viewRule": ADMIN_RULE, 
-                "createRule": APPROVER_RULE, "updateRule": APPROVER_RULE,
-                "deleteRule": '@request.auth.role = "admin"' if c_name not in ["plate_stats", "enhanced_plate_stats", "enhanced_vin_stats", "vins"] else None
+                "listRule": list_view, "viewRule": list_view, 
+                "createRule": cu_rule, "updateRule": cu_rule,
+                "deleteRule": '@request.auth.role ?= "admin"' if not is_view and c_name != "vins" else None
             })
 
         safe_patch("ice_change_log", {
@@ -211,24 +221,24 @@ def main():
             "createRule": None, "deleteRule": None
         })
         
-        dup_rule = '@request.auth.role = "admin" || @request.auth.role = "approver"'
+        dup_rule = '@request.auth.role ?= "admin" || @request.auth.role ?= "approver"'
         safe_patch("duplicate_queue", {
             "listRule": dup_rule, "viewRule": dup_rule, "createRule": dup_rule, "updateRule": dup_rule,
-            "deleteRule": '@request.auth.role = "admin"'
+            "deleteRule": '@request.auth.role ?= "admin"'
         })
 
         safe_patch("upload_batches", {
-            "listRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
-            "viewRule": 'uploaded_by = @request.auth.id || @request.auth.role = "approver" || @request.auth.role = "admin"',
-            "createRule": '@request.auth.role = "uploader" || @request.auth.role = "approver" || @request.auth.role = "admin"',
-            "updateRule": '@request.auth.role = "approver" || @request.auth.role = "admin"',
-            "deleteRule": '@request.auth.role = "admin"'
+            "listRule": 'uploaded_by = @request.auth.id || @request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
+            "viewRule": 'uploaded_by = @request.auth.id || @request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
+            "createRule": '@request.auth.role ?= "uploader" || @request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
+            "updateRule": '@request.auth.role ?= "approver" || @request.auth.role ?= "admin"',
+            "deleteRule": '@request.auth.role ?= "admin"'
         })
 
         if users_col:
-            user_rule = 'id = @request.auth.id || @request.auth.role = "admin"'
+            user_rule = 'id = @request.auth.id || @request.auth.role ?= "admin"'
             opts = users_col.get("options", {})
-            opts["manageRule"] = '@request.auth.role = "admin"'
+            opts["manageRule"] = '@request.auth.role ?= "admin"'
             safe_patch("users", {
                 "listRule": user_rule, "viewRule": user_rule, "updateRule": user_rule, 
                 "deleteRule": user_rule, "options": opts

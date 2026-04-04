@@ -40,7 +40,7 @@ COLUMN_MAP = {
 }
 
 VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR"}
-VALID_ICE    = {"Y", "N", "HS"}
+VALID_ICE    = {"Y", "N", "HS", "C"}
 VALID_MATCH  = {"Y", "N", ""}
 
 # ---------- helpers ----------
@@ -96,7 +96,7 @@ def derive_searchable(row: dict) -> bool:
     csv_val = row.pop("_searchable_from_csv", None)
     if csv_val is not None:
         return csv_val
-    # Auto-derive: searchable if ICE is Y or HS
+    # Auto-derive: only searchable if ICE is Y or HS; C (Cleared) explicitly becomes False
     return row.get("ice", "") in ("Y", "HS")
 
 
