@@ -149,6 +149,16 @@ describe('csvUtils', () => {
       expect(result.match_status).toBe('N');
     });
 
+    it('maps full color names to accepted abbreviations', () => {
+      expect(mapRow({ 'Color': 'silver' }).color).toBe('SL');
+      expect(mapRow({ 'Color': 'White' }).color).toBe('WH');
+      expect(mapRow({ 'Color': 'BLACK' }).color).toBe('BK');
+      expect(mapRow({ 'Color': ' rEd ' }).color).toBe('R');
+      expect(mapRow({ 'Color': 'Grey' }).color).toBe('GR');
+      // Fallback for unknown
+      expect(mapRow({ 'Color': 'Magenta' }).color).toBe('MAGENTA');
+    });
+
     it('maps VIN and title_issues columns', () => {
       const row = {
         'VIN Associated to Plate (if available)': '1HGCM82633A004352',

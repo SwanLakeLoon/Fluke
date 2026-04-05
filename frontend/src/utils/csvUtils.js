@@ -20,6 +20,22 @@ export const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'W
 export const VALID_ICE = new Set(['Y', 'N', 'HS']);
 export const VALID_MATCH = new Set(['Y', 'N', '']);
 
+export const COLOR_ALIASES = {
+  'silver': 'SL',
+  'white': 'WH',
+  'black': 'BK',
+  'red': 'R',
+  'blue': 'BL',
+  'brown': 'BR',
+  'gray': 'GR',
+  'grey': 'GR',
+  'tan': 'TN',
+  'green': 'GN',
+  'gold': 'GD',
+  'purple': 'PU',
+  'orange': 'OR'
+};
+
 export function parseDateString(dateStr) {
   if (!dateStr) return null;
   // Convert to string and strip invisible characters (like zero-width space)
@@ -95,7 +111,10 @@ export function mapRow(csvRow) {
   }
 
   // Normalize enum fields to uppercase early so downstream logic is consistent
-  if (mapped.color) mapped.color = mapped.color.toUpperCase();
+  if (mapped.color) {
+    const rawColor = mapped.color.toLowerCase();
+    mapped.color = COLOR_ALIASES[rawColor] || mapped.color.toUpperCase();
+  }
   if (mapped.ice) mapped.ice = mapped.ice.toUpperCase();
   if (mapped.match_status) mapped.match_status = mapped.match_status.toUpperCase();
   
