@@ -93,6 +93,11 @@ export function mapRow(csvRow) {
   if (noPlatesVariants.includes(mapped.plate.toLowerCase())) {
     mapped.plate = 'NO PLATES';
   }
+
+  // Normalize enum fields to uppercase early so downstream logic is consistent
+  if (mapped.color) mapped.color = mapped.color.toUpperCase();
+  if (mapped.ice) mapped.ice = mapped.ice.toUpperCase();
+  if (mapped.match_status) mapped.match_status = mapped.match_status.toUpperCase();
   
   // searchable: if column exists in CSV, use it; otherwise derive
   const searchableRaw = (lowerRow['searchable'] || '').toString().trim().toUpperCase();
@@ -121,19 +126,14 @@ export function mapRow(csvRow) {
 }
 
 export function validateRow(row) {
-  const errors = [];
-  if (!row.plate) errors.push('plate required');
-  else if (row.plate.length > 20) errors.push('plate too long');
+  const errors = {};
+  if (!row.plate) errors.plate = 'required';
+  else if (row.plate.length > 20) errors.plate = 'too long (max 20)';
   
-  if (row.state && row.state.length > 2) errors.push('state must be at most 2 chars');
-  if (row.color && !VALID_COLORS.has(row.color.toUpperCase())) errors.push(`invalid color: ${row.color}`);
-  if (row.ice && !VALID_ICE.has(row.ice.toUpperCase())) errors.push(`invalid ICE: ${row.ice}`);
-  if (row.match_status && !VALID_MATCH.has(row.match_status.toUpperCase())) errors.push(`invalid match: ${row.match_status}`);
-  
-  // Normalize fields that have enums to uppercase to prevent DB issues
-  if (row.color) row.color = row.color.toUpperCase();
-  if (row.ice) row.ice = row.ice.toUpperCase();
-  if (row.match_status) row.match_status = row.match_status.toUpperCase();
+  if (row.state && row.state.length > 2) errors.state = 'at most 2 chars';
+  if (row.color && !VALID_COLORS.has(row.color.toUpperCase())) errors.color = `invalid: ${row.color}`;
+  if (row.ice && !VALID_ICE.has(row.ice.toUpperCase())) errors.ice = `invalid: ${row.ice}`;
+  if (row.match_status && !VALID_MATCH.has(row.match_status.toUpperCase())) errors.match_status = `invalid: ${row.match_status}`;
   
   return errors;
 }

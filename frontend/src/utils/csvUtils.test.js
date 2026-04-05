@@ -71,32 +71,47 @@ describe('csvUtils', () => {
   describe('validateRow', () => {
     it('validates a pristine mapped row', () => {
       const valid = { plate: 'ABC', state: 'CA', color: 'WH', ice: 'N', match_status: 'Y' };
-      expect(validateRow(valid)).toHaveLength(0);
+      expect(Object.keys(validateRow(valid))).toHaveLength(0);
     });
 
     it('enforces plate constraints', () => {
-      expect(validateRow({})).toContain('plate required');
-      expect(validateRow({ plate: '' })).toContain('plate required');
-      expect(validateRow({ plate: '123456789012345678901' })).toContain('plate too long');
-      expect(validateRow({ plate: '12345678901234567890' })).toHaveLength(0); // 20 chars allowed
+      expect(validateRow({})).toHaveProperty('plate', 'required');
+      expect(validateRow({ plate: '' })).toHaveProperty('plate', 'required');
+      expect(validateRow({ plate: '123456789012345678901' })).toHaveProperty('plate', 'too long (max 20)');
+      expect(Object.keys(validateRow({ plate: '12345678901234567890' }))).toHaveLength(0); // 20 chars allowed
     });
 
     it('enforces state constraints', () => {
-      expect(validateRow({ plate: 'A', state: 'CAL' })).toContain('state must be at most 2 chars');
-      expect(validateRow({ plate: 'A', state: '' })).toHaveLength(0); // optional
-      expect(validateRow({ plate: 'A', state: 'CA' })).toHaveLength(0); // exact 2
+      expect(validateRow({ plate: 'A', state: 'CAL' })).toHaveProperty('state', 'at most 2 chars');
+      expect(Object.keys(validateRow({ plate: 'A', state: '' }))).toHaveLength(0); // optional
+      expect(Object.keys(validateRow({ plate: 'A', state: 'CA' }))).toHaveLength(0); // exact 2
     });
 
     it('enforces valid enums', () => {
       const result = validateRow({ plate: 'A', color: 'XX', ice: 'MAYBE', match_status: 'IDK' });
-      expect(result).toHaveLength(3);
-      expect(result.some(e => e.includes('invalid color'))).toBe(true);
-      expect(result.some(e => e.includes('invalid ICE'))).toBe(true);
-      expect(result.some(e => e.includes('invalid match'))).toBe(true);
+      expect(Object.keys(result)).toHaveLength(3);
+      expect(result).toHaveProperty('color', 'invalid: XX');
+      expect(result).toHaveProperty('ice', 'invalid: MAYBE');
+      expect(result).toHaveProperty('match_status', 'invalid: IDK');
     });
 
     it('validates OR as a valid color', () => {
-      expect(validateRow({ plate: 'A', color: 'OR' })).toHaveLength(0);
+      expect(Object.keys(validateRow({ plate: 'A', color: 'OR' }))).toHaveLength(0);
+    });
+
+    it('does NOT mutate the input row object', () => {
+      const row = { plate: 'A', color: 'wh', ice: 'n', match_status: 'y' };
+      validateRow(row);
+      // These must remain lowercase — validateRow must be a pure function
+      expect(row.color).toBe('wh');
+      expect(row.ice).toBe('n');
+      expect(row.match_status).toBe('y');
+    });
+
+    it('validates case-insensitively (lowercase enum values pass)', () => {
+      // validateRow checks .toUpperCase() internally, so lowercase valid values should pass
+      const result = validateRow({ plate: 'A', color: 'wh', ice: 'n', match_status: 'y' });
+      expect(Object.keys(result)).toHaveLength(0);
     });
   });
 
@@ -124,6 +139,14 @@ describe('csvUtils', () => {
       expect(result.date).toBeNull();
       expect(result.plate_confidence).toBe(0);
       expect(result.searchable).toBe(false);
+    });
+
+    it('uppercases enum fields (color, ice, match_status) during mapping', () => {
+      const row = { 'Plate': 'ABC', 'Color': 'wh', 'ICE': 'y', 'Match': 'n' };
+      const result = mapRow(row);
+      expect(result.color).toBe('WH');
+      expect(result.ice).toBe('Y');
+      expect(result.match_status).toBe('N');
     });
 
     it('maps VIN and title_issues columns', () => {

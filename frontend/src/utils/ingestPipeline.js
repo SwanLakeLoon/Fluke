@@ -305,8 +305,8 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
   let firstError = null;
 
   // Track sightings "in-flight" or already processed in this batch to prevent race conditions
-  // Key format: "plate|YYYY-MM-DD|location"
-  const inBatchSightings = new Set();
+  // Key format: "plate|YYYY-MM-DD|location" → sighting ID (or true if pending)
+  const inBatchSightings = new Map();
 
   for (let i = 0; i < records.length; i += concurrency) {
     const chunk = records.slice(i, i + concurrency);
@@ -318,12 +318,26 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
         
         // Immediate internal duplicate check
         if (inBatchSightings.has(sightingKey)) {
-          await logDuplicate(pb, record, null, `Internal duplicate in same batch: ${batchLabel}`);
+          const pendingPromise = inBatchSightings.get(sightingKey);
+          const existingId = pendingPromise ? await pendingPromise : null;
+          await logDuplicate(pb, record, existingId, `Internal duplicate in same batch: ${batchLabel}`);
           return { result: 'duplicate' };
         }
         
-        inBatchSightings.add(sightingKey);
-        return ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache, sightingCache);
+        let resolveSightingId;
+        const pendingPromise = new Promise(resolve => resolveSightingId = resolve);
+        inBatchSightings.set(sightingKey, pendingPromise);
+        
+        const outcome = await ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache, sightingCache);
+        
+        // Resolve the promise so any waiting internal duplicates can get the ID
+        if (outcome.result === 'inserted' && outcome.sightingId) {
+          resolveSightingId(outcome.sightingId);
+        } else {
+          resolveSightingId(null);
+        }
+        
+        return outcome;
       })
     );
 
@@ -416,7 +430,7 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
       return { result: 'duplicate' };
     }
 
-    await pb.collection('sightings').create({
+    const newSighting = await pb.collection('sightings').create({
       vehicle:          vehicle.id,
       location:         record.location,
       date:             record.date || null,
@@ -426,7 +440,10 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
       notes:            record.notes,
     });
 
-    return { result: 'inserted' };
+    // Add to cache so later records in same batch detect this as existing
+    sightingCache.set(cacheKey, newSighting.id);
+
+    return { result: 'inserted', sightingId: newSighting.id };
   } catch (err) {
     return { result: 'error', error: err };
   }

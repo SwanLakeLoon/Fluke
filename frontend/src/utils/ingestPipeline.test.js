@@ -360,6 +360,38 @@ describe('processBatch', () => {
     expect(pb._mocks.sightings.create).toHaveBeenCalledOnce();
     // duplicate_queue.create should be called for the second record
     expect(pb._mocks.duplicate_queue.create).toHaveBeenCalledOnce();
+    // The duplicate_queue entry must reference the sighting ID of the first record
+    expect(pb._mocks.duplicate_queue.create).toHaveBeenCalledWith(
+      expect.objectContaining({ existing_record_id: 's1' })
+    );
+  });
+
+  it('12 — newly inserted sightings are visible to later records in the same batch', async () => {
+    // Record 1 inserts. Record 2 is a DB-level dup against a sighting that was
+    // created by record 1 in this same batch (not pre-existing in DB).
+    // This tests that sightingCache is updated after creation.
+    const record1 = { ...baseRecord, plate: 'NEW999', date: '2024-07-01T00:00:00Z', location: 'Whipple' };
+    const record2 = { ...baseRecord, plate: 'NEW999', date: '2024-07-01T00:00:00Z', location: 'Whipple' };
+
+    const pb = makePb();
+
+    pb._mocks.vehicles.getFirstListItem.mockRejectedValue(new Error('not found'));
+    pb._mocks.vehicles.create.mockResolvedValue({ id: 'v_new', plate: 'NEW999' });
+    pb._mocks.sightings.getList.mockResolvedValue({ items: [] });
+    pb._mocks.sightings.create.mockResolvedValue({ id: 's_new' });
+    pb._mocks.duplicate_queue.create.mockResolvedValue({});
+
+    // Use concurrency=1 to ensure sequential processing so record2
+    // sees record1's sighting in the inBatchSightings map
+    const counts = await processBatch(pb, [record1, record2], 'cache-test', 1);
+
+    expect(counts.inserted).toBe(1);
+    expect(counts.dupsQueued).toBe(1);
+    expect(pb._mocks.sightings.create).toHaveBeenCalledOnce();
+    // The internal dup should reference the newly created sighting
+    expect(pb._mocks.duplicate_queue.create).toHaveBeenCalledWith(
+      expect.objectContaining({ existing_record_id: 's_new' })
+    );
   });
 });
 

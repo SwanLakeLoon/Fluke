@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { pb } from '../../api/client';
 import { processBatch } from '../../utils/ingestPipeline';
+import { validateRow, VALID_COLORS } from '../../utils/csvUtils';
 import './AdminPages.css';
 
 export default function ApprovalQueue({ embedded = false }) {
@@ -27,6 +28,15 @@ export default function ApprovalQueue({ embedded = false }) {
   };
 
   useEffect(() => { fetchBatches(); }, []);
+
+  const handleRowChange = (batchId, rowIndex, field, value) => {
+    setBatches(prev => prev.map(b => {
+      if (b.id !== batchId) return b;
+      const newRows = [...b.rows];
+      newRows[rowIndex] = { ...newRows[rowIndex], [field]: value };
+      return { ...b, rows: newRows };
+    }));
+  };
 
   const handleRemoveRow = async (batch, rowIndex) => {
     // Remove from local state
@@ -90,9 +100,9 @@ export default function ApprovalQueue({ embedded = false }) {
 
     const { inserted, dupsQueued, errors } = await processBatch(pb, rows, batchLabel);
 
-    // Mark batch as approved
+    // Mark batch as approved & save final row edits to the audit log
     try {
-      await pb.collection('upload_batches').update(batch.id, { status: 'approved' });
+      await pb.collection('upload_batches').update(batch.id, { status: 'approved', rows: batch.rows });
     } catch (e) {
       console.error('Failed to update batch status:', e);
     }
@@ -200,20 +210,26 @@ export default function ApprovalQueue({ embedded = false }) {
                   <table className="data-table">
                     <thead>
                       <tr>
-                      <th></th>
+                        <th></th>
                         <th>#</th>
+                        <th>Status</th>
                         <th>Plate</th>
                         <th>State</th>
+                        <th>Date</th>
+                        <th>Location</th>
                         <th>Make</th>
                         <th>Model</th>
+                        <th>Color</th>
                         <th>ICE</th>
-                        <th>Location</th>
-                        <th>Date</th>
+                        <th>Searchable</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(showAllRowsId === batch.id ? batch.rows : batch.rows.slice(0, 50)).map((row, i) => (
-                        <tr key={i}>
+                      {(showAllRowsId === batch.id ? batch.rows : batch.rows.slice(0, 50)).map((row, i) => {
+                        const errors = validateRow(row);
+                        const hasErrors = Object.keys(errors).length > 0;
+                        return (
+                          <tr key={i} className={hasErrors ? 'row-error' : ''}>
                             <td>
                               <button
                                 title="Remove this row from batch"
@@ -221,16 +237,83 @@ export default function ApprovalQueue({ embedded = false }) {
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '1rem', padding: '0 4px', lineHeight: 1 }}
                               >✕</button>
                             </td>
-                          <td>{i + 1}</td>
-                          <td><strong>{row.plate}</strong></td>
-                          <td>{row.state}</td>
-                          <td>{row.make}</td>
-                          <td>{row.model}</td>
-                          <td>{row.ice}</td>
-                          <td>{row.location}</td>
-                          <td>{row.date ? new Date(row.date).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
-                        </tr>
-                      ))}
+                            <td>{i + 1}</td>
+                            <td>
+                              {hasErrors
+                                ? <span className="badge badge-danger">Invalid</span>
+                                : <span className="badge badge-success">Valid</span>}
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '100px', ...(errors.plate && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.plate || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'plate', e.target.value.toUpperCase())}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '60px', ...(errors.state && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.state || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'state', e.target.value.toUpperCase())}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '110px', ...(errors.date && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.date || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'date', e.target.value)}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '120px', ...(errors.location && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.location || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'location', e.target.value)}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '100px', ...(errors.make && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.make || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'make', e.target.value)}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '120px', ...(errors.model && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.model || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'model', e.target.value)}
+                                disabled={processing === batch.id}
+                              />
+                            </td>
+                            <td>
+                              <select
+                                className="input input-sm"
+                                style={{ width: '70px', padding: '0 4px', ...(errors.color && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.color || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'color', e.target.value)}
+                                disabled={processing === batch.id}
+                              >
+                                <option value="">—</option>
+                                {[...VALID_COLORS].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                              </select>
+                            </td>
+                            <td>{row.ice || '—'}</td>
+                            <td>{row.searchable ? 'Yes' : 'No'}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                   {batch.rows.length > 50 && (

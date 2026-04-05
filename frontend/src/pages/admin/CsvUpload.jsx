@@ -5,7 +5,7 @@ import { processBatch } from '../../utils/ingestPipeline';
 import { useAuth } from '../../hooks/useAuth';
 import './AdminPages.css';
 
-import { mapRow, validateRow } from '../../utils/csvUtils';
+import { mapRow, validateRow, VALID_COLORS } from '../../utils/csvUtils';
 
 export default function CsvUpload() {
   const { user, isAdmin, isApprover } = useAuth();
@@ -22,7 +22,17 @@ export default function CsvUpload() {
   const handleRemovePreviewRow = (index) => {
     const next = preview.filter(r => r.index !== index);
     setPreview(next);
-    setValidationErrors(next.filter(r => r.errors.length > 0));
+    setValidationErrors(next.filter(r => Object.keys(r.errors).length > 0));
+  };
+
+  const handleFieldChange = (index, field, value) => {
+    const next = preview.map(r => {
+      if (r.index !== index) return r;
+      const mapped = { ...r.mapped, [field]: value };
+      return { ...r, mapped, errors: validateRow(mapped) };
+    });
+    setPreview(next);
+    setValidationErrors(next.filter(r => Object.keys(r.errors).length > 0));
   };
 
   const handleFile = (f) => {
@@ -45,7 +55,7 @@ export default function CsvUpload() {
           };
         });
         setPreview(mapped);
-        setValidationErrors(mapped.filter(r => r.errors.length > 0));
+        setValidationErrors(mapped.filter(r => Object.keys(r.errors).length > 0));
       },
     });
   };
@@ -58,7 +68,7 @@ export default function CsvUpload() {
   };
 
   const handleImport = async () => {
-    const validRows = preview.filter(r => r.errors.length === 0);
+    const validRows = preview.filter(r => Object.keys(r.errors).length === 0);
 
     // Frontend check for missing location/date
     const hasMissingData = validRows.some(r => !r.mapped.location || !r.mapped.date);
@@ -94,7 +104,7 @@ export default function CsvUpload() {
 
     const batchLabel = `${batchName} (by ${user.name || user.username || user.email || 'Admin'})`;
     const { inserted, dupsQueued, errors: rejectedCount } = await processBatch(pb, validRows.map(r => r.mapped), batchLabel);
-    const rejected = preview.filter(r => r.errors.length > 0).length + rejectedCount;
+    const rejected = preview.filter(r => Object.keys(r.errors).length > 0).length + rejectedCount;
 
     setResult({ inserted, dupsQueued, rejected });
 
@@ -203,7 +213,7 @@ export default function CsvUpload() {
             <h3>⚠️ {validationErrors.length} row{validationErrors.length !== 1 ? 's' : ''} with validation issues:</h3>
             {validationErrors.slice(0, 10).map(r => (
               <div key={r.index} className="val-error">
-                Row {r.index}: {r.errors.join(', ')}
+                Row {r.index}: {Object.entries(r.errors).map(([k, v]) => `${k} ${v}`).join(', ')}
               </div>
             ))}
             {validationErrors.length > 10 && <p>...and {validationErrors.length - 10} more</p>}
@@ -243,15 +253,17 @@ export default function CsvUpload() {
                     <th>Plate</th>
                     <th>State</th>
                     <th>Date</th>
+                    <th>Location</th>
                     <th>Make</th>
                     <th>Model</th>
+                    <th>Color</th>
                     <th>ICE</th>
                     <th>Searchable</th>
                   </tr>
                 </thead>
                 <tbody>
                   {(showAllPreview ? preview : preview.slice(0, 50)).map(r => (
-                    <tr key={r.index} className={r.errors.length > 0 ? 'row-error' : ''}>
+                    <tr key={r.index} className={Object.keys(r.errors).length > 0 ? 'row-error' : ''}>
                       <td>
                         <button
                           title="Remove this row"
@@ -262,16 +274,77 @@ export default function CsvUpload() {
                       </td>
                       <td>{r.index}</td>
                       <td>
-                        {r.errors.length > 0
+                        {Object.keys(r.errors).length > 0
                           ? <span className="badge badge-danger">Invalid</span>
                           : <span className="badge badge-success">Valid</span>}
                       </td>
-                      <td>{r.mapped.plate}</td>
-                      <td>{r.mapped.state}</td>
-                      <td>{r.mapped.date || '—'}</td>
-                      <td>{r.mapped.make}</td>
-                      <td>{r.mapped.model}</td>
-                      <td>{r.mapped.ice}</td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '100px', ...(r.errors.plate && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.plate || ''}
+                          onChange={e => handleFieldChange(r.index, 'plate', e.target.value.toUpperCase())}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '60px', ...(r.errors.state && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.state || ''}
+                          onChange={e => handleFieldChange(r.index, 'state', e.target.value.toUpperCase())}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '110px', ...(r.errors.date && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.date || ''}
+                          onChange={e => handleFieldChange(r.index, 'date', e.target.value)}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '120px', ...(r.errors.location && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.location || ''}
+                          onChange={e => handleFieldChange(r.index, 'location', e.target.value)}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '100px', ...(r.errors.make && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.make || ''}
+                          onChange={e => handleFieldChange(r.index, 'make', e.target.value)}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '120px', ...(r.errors.model && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.model || ''}
+                          onChange={e => handleFieldChange(r.index, 'model', e.target.value)}
+                          disabled={importing}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="input input-sm"
+                          style={{ width: '70px', padding: '0 4px', ...(r.errors.color && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.color || ''}
+                          onChange={e => handleFieldChange(r.index, 'color', e.target.value)}
+                          disabled={importing}
+                        >
+                          <option value="">—</option>
+                          {[...VALID_COLORS].sort().map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td>{r.mapped.ice || '—'}</td>
                       <td>{r.mapped.searchable ? 'Yes' : 'No'}</td>
                     </tr>
                   ))}

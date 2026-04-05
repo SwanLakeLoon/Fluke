@@ -30,8 +30,13 @@ export default function DuplicateReview({ embedded = false }) {
               if (vRes.items.length > 0) {
                 const vid = vRes.items[0].id;
                 const loc = dup.raw_data.location || '';
+                const dateStr = dup.raw_data.date ? dup.raw_data.date.substring(0, 10) : '';
+                let sFilter = `vehicle = "${vid}" && location = "${loc.replace(/"/g, '\\"')}"`;
+                if (dateStr) {
+                  sFilter += ` && date ~ "${dateStr}"`;
+                }
                 const sRes = await pb.collection('sightings').getList(1, 1, {
-                  filter: `vehicle = "${vid}" && location = "${loc.replace(/"/g, '\\"')}"`,
+                  filter: sFilter,
                   sort: '-date',
                   fields: 'id',
                 });
