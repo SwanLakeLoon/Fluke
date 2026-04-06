@@ -222,6 +222,9 @@ export default function ApprovalQueue({ embedded = false }) {
                         <th>Color</th>
                         <th>ICE</th>
                         <th>Searchable</th>
+                        <th>VIN</th>
+                        <th>VIN Source</th>
+                        <th>Title Issues</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -311,6 +314,39 @@ export default function ApprovalQueue({ embedded = false }) {
                             </td>
                             <td>{row.ice || '—'}</td>
                             <td>{row.searchable ? 'Yes' : 'No'}</td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '150px', ...(errors.vin && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                                value={row.vin || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'vin', e.target.value.trim().toUpperCase())}
+                                disabled={processing === batch.id}
+                                placeholder="Optional"
+                              />
+                              {errors.vin && <div style={{ color: 'var(--danger)', fontSize: '0.7rem', marginTop: 2 }}>{errors.vin}</div>}
+                            </td>
+                            <td>
+                              <select
+                                className="input input-sm"
+                                style={{ width: '110px', padding: '0 4px' }}
+                                value={row.vin_source || 'Plate VIN'}
+                                onChange={e => handleRowChange(batch.id, i, 'vin_source', e.target.value)}
+                                disabled={processing === batch.id}
+                              >
+                                <option value="Plate VIN">Plate VIN</option>
+                                <option value="Vehicle VIN">Vehicle VIN</option>
+                              </select>
+                            </td>
+                            <td>
+                              <input
+                                className="input input-sm"
+                                style={{ width: '130px' }}
+                                value={row.title_issues || ''}
+                                onChange={e => handleRowChange(batch.id, i, 'title_issues', e.target.value)}
+                                disabled={processing === batch.id}
+                                placeholder="Optional"
+                              />
+                            </td>
                           </tr>
                         );
                       })}

@@ -187,5 +187,43 @@ describe('csvUtils', () => {
       // Case-insensitive header match, but the value must be exact
       expect(mapRow({ 'vin source': 'Vehicle VIN' }).vin_source).toBe('Vehicle VIN');
     });
+
+    it('normalizes VIN to uppercase and trims whitespace', () => {
+      const result = mapRow({ 'VIN Associated to Plate (if available)': '  1hgcm82633a004352  ' });
+      expect(result.vin).toBe('1HGCM82633A004352');
+    });
+
+    it('preserves empty VIN as empty string', () => {
+      expect(mapRow({}).vin).toBe('');
+    });
+  });
+});
+
+describe('validateRow — VIN validation', () => {
+  it('accepts a valid 17-character alphanumeric VIN', () => {
+    const errors = validateRow({ plate: 'ABC123', vin: '1HGCM82633A004352' });
+    expect(errors.vin).toBeUndefined();
+  });
+
+  it('accepts a VIN up to 50 characters', () => {
+    const longVin = 'A'.repeat(50);
+    const errors = validateRow({ plate: 'ABC123', vin: longVin });
+    expect(errors.vin).toBeUndefined();
+  });
+
+  it('rejects a VIN exceeding 50 characters', () => {
+    const tooLong = 'A'.repeat(51);
+    const errors = validateRow({ plate: 'ABC123', vin: tooLong });
+    expect(errors.vin).toMatch(/too long/);
+  });
+
+  it('rejects a VIN with special characters', () => {
+    const errors = validateRow({ plate: 'ABC123', vin: '1HGC-M826!33A004' });
+    expect(errors.vin).toMatch(/only letters and numbers/);
+  });
+
+  it('allows a missing (empty) VIN with no error', () => {
+    const errors = validateRow({ plate: 'ABC123', vin: '' });
+    expect(errors.vin).toBeUndefined();
   });
 });

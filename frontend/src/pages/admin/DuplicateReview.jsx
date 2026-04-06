@@ -82,7 +82,9 @@ export default function DuplicateReview({ embedded = false }) {
   const handleKeepBoth = async (dup) => {
     if (!window.confirm("Insert the incoming record as a completely new entry?")) return;
     try {
-      // VIN phase
+      const isPhysical = dup.raw_data.vin_source === 'Vehicle VIN';
+
+      // VIN phase — route to correct relation field
       let vinRelationId = null;
       if (dup.raw_data.vin) {
         const vinRec = await findOrCreateVin(pb, dup.raw_data.vin, dup.raw_data.title_issues);
@@ -93,15 +95,19 @@ export default function DuplicateReview({ embedded = false }) {
       try {
         const safePlate = (dup.raw_data.plate || '').replace(/"/g, '\\"');
         vehicle = await pb.collection('vehicles').getFirstListItem(`plate = "${safePlate}"`);
-        // Backfill vin_relation if missing
-        if (vinRelationId && !vehicle.vin_relation) {
+        // Backfill whichever relation field is missing
+        if (isPhysical && vinRelationId && !vehicle.physical_vin_relation) {
+          vehicle = await pb.collection('vehicles').update(vehicle.id, { physical_vin_relation: vinRelationId });
+        } else if (!isPhysical && vinRelationId && !vehicle.vin_relation) {
           vehicle = await pb.collection('vehicles').update(vehicle.id, { vin_relation: vinRelationId });
         }
       } catch (e) {
         vehicle = await pb.collection('vehicles').create({
           plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
           model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
-          vin_relation: vinRelationId || '', searchable: dup.raw_data.searchable ?? false,
+          vin_relation:          isPhysical ? '' : (vinRelationId || ''),
+          physical_vin_relation: isPhysical ? (vinRelationId || '') : '',
+          searchable: dup.raw_data.searchable ?? false,
         });
       }
       await pb.collection('sightings').create({
@@ -120,7 +126,9 @@ export default function DuplicateReview({ embedded = false }) {
   const handleReplace = async (dup) => {
     if (!window.confirm("Overwrite the existing database record with the incoming data?")) return;
     try {
-      // VIN phase
+      const isPhysical = dup.raw_data.vin_source === 'Vehicle VIN';
+
+      // VIN phase — route to correct relation field
       let vinRelationId = null;
       if (dup.raw_data.vin) {
         const vinRec = await findOrCreateVin(pb, dup.raw_data.vin, dup.raw_data.title_issues);
@@ -128,7 +136,6 @@ export default function DuplicateReview({ embedded = false }) {
       }
 
       if (dup.existing_record_id) {
-        // Fetch FIRST to get vehicle FK, then write
         const existingSighting = await pb.collection('sightings').getOne(dup.existing_record_id);
         await pb.collection('sightings').update(dup.existing_record_id, {
           location: dup.raw_data.location, date: dup.raw_data.date || null,
@@ -136,9 +143,10 @@ export default function DuplicateReview({ embedded = false }) {
           plate_confidence: dup.raw_data.plate_confidence || 0, notes: dup.raw_data.notes,
         });
         await pb.collection('vehicles').update(existingSighting.vehicle, {
-          state: dup.raw_data.state, make: dup.raw_data.make, model: dup.raw_data.model, 
+          state: dup.raw_data.state, make: dup.raw_data.make, model: dup.raw_data.model,
           color: dup.raw_data.color, registration: dup.raw_data.registration,
-          vin_relation: vinRelationId || '',
+          vin_relation:          isPhysical ? '' : (vinRelationId || ''),
+          physical_vin_relation: isPhysical ? (vinRelationId || '') : '',
         });
       } else {
         let vehicle;
@@ -149,7 +157,9 @@ export default function DuplicateReview({ embedded = false }) {
           vehicle = await pb.collection('vehicles').create({
             plate: dup.raw_data.plate, state: dup.raw_data.state, make: dup.raw_data.make,
             model: dup.raw_data.model, color: dup.raw_data.color, registration: dup.raw_data.registration,
-            vin_relation: vinRelationId || '', searchable: dup.raw_data.searchable ?? false,
+            vin_relation:          isPhysical ? '' : (vinRelationId || ''),
+            physical_vin_relation: isPhysical ? (vinRelationId || '') : '',
+            searchable: dup.raw_data.searchable ?? false,
           });
         }
         await pb.collection('sightings').create({

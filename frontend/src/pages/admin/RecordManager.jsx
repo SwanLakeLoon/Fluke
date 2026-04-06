@@ -338,6 +338,9 @@ export default function RecordManager() {
 
   // --- Inline Edit ---
   const startEditSubrow = (v, r) => {
+    // Track original VIN values so we can detect intentional clears
+    const originalVin         = (v.isVinMode ? v.vin        : (v._vin          || ''));
+    const originalPhysicalVin = (v.isVinMode ? ''           : (v._physical_vin || ''));
     setEditingId(r.id);
     setEditingVehicleId(v.isVinMode ? r._vehicleId : v.id);
     setEditData({
@@ -349,8 +352,10 @@ export default function RecordManager() {
       ice: r.ice || '',
       match_status: r.match_status || '',
       registration: (v.isVinMode ? r._registration : v.registration) || '',
-      vin:          v.isVinMode ? v.vin :          (v._vin          || ''),
-      physical_vin: v.isVinMode ? ''   :          (v._physical_vin || ''),
+      vin:          originalVin,
+      physical_vin: originalPhysicalVin,
+      _originalVin:         originalVin,
+      _originalPhysicalVin: originalPhysicalVin,
       title_issues: v.isVinMode ? v.title_issues : (v._title_issues || ''),
       notes: r.notes || '',
       location: r.location || '',
@@ -366,24 +371,32 @@ export default function RecordManager() {
 
   const saveEdit = async () => {
     try {
-      // Handle Plate VIN: find-or-create in vins collection
-      let vinRelationId = null;
-      if (editData.vin) {
-        const vinRec = await findOrCreateVin(pb, editData.vin, editData.title_issues);
-        vinRelationId = vinRec?.id || null;
+      // Handle Plate VIN — only update if the user actually changed the value
+      let vinRelationId = undefined; // undefined = "don't touch the field"
+      if (editData.vin !== editData._originalVin) {
+        if (editData.vin) {
+          const vinRec = await findOrCreateVin(pb, editData.vin, editData.title_issues);
+          vinRelationId = vinRec?.id || '';
+        } else {
+          vinRelationId = ''; // user explicitly cleared it
+        }
       }
-      // Handle Physical VIN separately
-      let physVinRelationId = null;
-      if (editData.physical_vin) {
-        const physVinRec = await findOrCreateVin(pb, editData.physical_vin, '');
-        physVinRelationId = physVinRec?.id || null;
+      // Handle Physical VIN — only update if changed
+      let physVinRelationId = undefined;
+      if (editData.physical_vin !== editData._originalPhysicalVin) {
+        if (editData.physical_vin) {
+          const physVinRec = await findOrCreateVin(pb, editData.physical_vin, '');
+          physVinRelationId = physVinRec?.id || '';
+        } else {
+          physVinRelationId = '';
+        }
       }
 
       const vData = {
         plate: editData.plate, state: editData.state, make: editData.make,
         model: editData.model, color: editData.color, registration: editData.registration,
-        vin_relation:          vinRelationId     || '',
-        physical_vin_relation: physVinRelationId || '',
+        ...(vinRelationId !== undefined         ? { vin_relation: vinRelationId }             : {}),
+        ...(physVinRelationId !== undefined     ? { physical_vin_relation: physVinRelationId } : {}),
       };
       const sData = {
         location: editData.location, date: editData.date, ice: editData.ice,
@@ -395,7 +408,7 @@ export default function RecordManager() {
       setEditingId(null);
       setEditingVehicleId(null);
       setEditData({});
-      fetchRecords(); // Refetch to rebuild grouping cleanly
+      fetchRecords();
     } catch (e) {
       console.error('Save failed:', e);
       alert('Save failed: ' + (e.message || 'Unknown error'));
@@ -457,14 +470,17 @@ export default function RecordManager() {
   const handleSearchableToggle = async (v, currentSearchable) => {
     try {
       if (v.isVinMode) {
-         const vehicles = await pb.collection('vehicles').getFullList({ filter: `vin_relation = "${v.id}"` });
+         // Update ALL vehicles linked to this VIN via either relation field
+         const vehicles = await pb.collection('vehicles').getFullList({
+           filter: `vin_relation = "${v.id}" || physical_vin_relation = "${v.id}"`,
+         });
          for (const veh of vehicles) {
             await pb.collection('vehicles').update(veh.id, { searchable: !currentSearchable });
          }
       } else {
          await pb.collection('vehicles').update(v.id, { searchable: !currentSearchable });
       }
-      fetchRecords(); // Refetch to correctly bubble searchable state to vehicle root
+      fetchRecords();
     } catch (e) {
       console.error('Toggle failed:', e);
     }
@@ -599,7 +615,7 @@ export default function RecordManager() {
           <table className="data-table">
             <thead>
               <tr>
-                <th style={{ width: 40 }}><input type="checkbox" onChange={selectAll} checked={selected.size > 0 && selected.size === records.flatMap(v => v.sightings).length} /></th>
+                <th style={{ width: 40 }}><input type="checkbox" onChange={selectAll} checked={(() => { const all = records.flatMap(v => v.sightings); return all.length > 0 && selected.size === all.length; })()} /></th>
                 <th>{viewMode === 'vin' ? 'VIN' : 'Plate'}</th>
                 {viewMode === 'vin' ? (
                   <>
@@ -642,7 +658,14 @@ export default function RecordManager() {
                     </td>
                     <td>
                       <div><strong>{v.isVinMode ? (v.vin || 'Unknown VIN') : v.plate}</strong></div>
-                      {!v.isVinMode && v._physical_vin && v._physical_vin !== v._vin && (
+                      {!v.isVinMode && v._physical_vin && (
+                        <div style={{ marginTop: '3px' }}>
+                          <span style={{ fontSize: '0.68rem', color: 'var(--warning)', fontFamily: 'monospace', letterSpacing: '0.04em' }}>
+                            🔍 {v._physical_vin}
+                          </span>
+                        </div>
+                      )}
+                      {!v.isVinMode && v._physical_vin && v._physical_vin !== v._vin && v._vin && (
                         <span className="badge badge-warning" style={{ fontSize: '0.7rem', marginTop: '4px' }}>⚠️ VIN Discrepancy</span>
                       )}
                       {!v.isVinMode && v.sightings.length > 1 && (
@@ -655,7 +678,7 @@ export default function RecordManager() {
                     </td>
                     {v.isVinMode ? (
                       <>
-                        <td>{v.plate_list ? v.plate_list.split(',').join(', ') : '—'}</td>
+                        <td>{v.plate_list ? String(v.plate_list).split(',').join(', ') : '—'}</td>
                         <td>{v.title_issues || '—'}</td>
                         <td>{v.latest_sighting ? new Date(v.latest_sighting).toLocaleDateString('en-US', { timeZone: 'UTC' }) : '—'}</td>
                         <td colSpan={4}>

@@ -259,6 +259,9 @@ export default function CsvUpload() {
                     <th>Color</th>
                     <th>ICE</th>
                     <th>Searchable</th>
+                    <th>VIN</th>
+                    <th>VIN Source</th>
+                    <th>Title Issues</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -346,6 +349,39 @@ export default function CsvUpload() {
                       </td>
                       <td>{r.mapped.ice || '—'}</td>
                       <td>{r.mapped.searchable ? 'Yes' : 'No'}</td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '150px', ...(r.errors.vin && { border: '1px solid var(--danger)', background: 'var(--danger-dim)' }) }}
+                          value={r.mapped.vin || ''}
+                          onChange={e => handleFieldChange(r.index, 'vin', e.target.value.trim().toUpperCase())}
+                          disabled={importing}
+                          placeholder="Optional"
+                        />
+                        {r.errors.vin && <div style={{ color: 'var(--danger)', fontSize: '0.7rem', marginTop: 2 }}>{r.errors.vin}</div>}
+                      </td>
+                      <td>
+                        <select
+                          className="input input-sm"
+                          style={{ width: '110px', padding: '0 4px' }}
+                          value={r.mapped.vin_source || 'Plate VIN'}
+                          onChange={e => handleFieldChange(r.index, 'vin_source', e.target.value)}
+                          disabled={importing}
+                        >
+                          <option value="Plate VIN">Plate VIN</option>
+                          <option value="Vehicle VIN">Vehicle VIN</option>
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          className="input input-sm"
+                          style={{ width: '130px' }}
+                          value={r.mapped.title_issues || ''}
+                          onChange={e => handleFieldChange(r.index, 'title_issues', e.target.value)}
+                          disabled={importing}
+                          placeholder="Optional"
+                        />
+                      </td>
                     </tr>
                   ))}
                 </tbody>

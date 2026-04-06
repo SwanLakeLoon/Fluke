@@ -269,14 +269,7 @@ def process_csv_rows(
 
                 vehicle_cache[plate] = vehicle_id
 
-            # 6. Vehicle VIN rows only exist to set physical_vin_relation.
-            # They share the same plate/date/location as the Plate VIN sighting,
-            # so skip the duplicate check and sighting creation entirely.
-            if record.get("vin_source") == "Vehicle VIN":
-                result["inserted"] += 1
-                continue
-
-            # 7. Duplicate check (vehicle + date + location)
+            # 6. Duplicate check (vehicle + date + location)
             date = record.get("date") or ""
             location = record.get("location") or ""
 
@@ -311,7 +304,11 @@ def process_csv_rows(
                 existing_id = None
 
             if is_dup:
-                # Stage as duplicate
+                # Vehicle VIN rows auto-merge with existing sightings — no duplicate queue entry.
+                if record.get("vin_source") == "Vehicle VIN":
+                    result["inserted"] += 1
+                    continue
+                # Stage regular Plate VIN duplicates for approver review
                 try:
                     client.post(
                         f"{pb_url}/api/collections/duplicate_queue/records",

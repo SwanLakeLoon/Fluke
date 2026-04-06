@@ -141,18 +141,30 @@ export function mapRow(csvRow) {
   const rawVinSource = (mapped.vin_source || '').trim();
   mapped.vin_source = rawVinSource === 'Vehicle VIN' ? 'Vehicle VIN' : 'Plate VIN';
 
+  // Normalize VIN: trim whitespace and uppercase
+  if (mapped.vin) mapped.vin = mapped.vin.trim().toUpperCase();
+
   return mapped;
 }
+
+// Valid VIN: alphanumeric characters only, 1–50 chars
+const VIN_RE = /^[A-Z0-9]+$/;
 
 export function validateRow(row) {
   const errors = {};
   if (!row.plate) errors.plate = 'required';
   else if (row.plate.length > 20) errors.plate = 'too long (max 20)';
-  
+
   if (row.state && row.state.length > 2) errors.state = 'at most 2 chars';
   if (row.color && !VALID_COLORS.has(row.color.toUpperCase())) errors.color = `invalid: ${row.color}`;
   if (row.ice && !VALID_ICE.has(row.ice.toUpperCase())) errors.ice = `invalid: ${row.ice}`;
   if (row.match_status && !VALID_MATCH.has(row.match_status.toUpperCase())) errors.match_status = `invalid: ${row.match_status}`;
-  
+
+  if (row.vin) {
+    const v = row.vin.trim().toUpperCase();
+    if (v.length > 50) errors.vin = 'too long (max 50 characters)';
+    else if (!VIN_RE.test(v)) errors.vin = 'only letters and numbers allowed';
+  }
+
   return errors;
 }

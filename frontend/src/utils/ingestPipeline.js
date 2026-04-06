@@ -156,17 +156,15 @@ export async function ingestRecord(pb, record, batchLabel) {
     // Phase 2: Vehicle
     const vehicle = await findOrCreateVehicle(pb, record, vinRelationId);
 
-    // Phase 3: Vehicle VIN rows are only here to set physical_vin_relation.
-    // They share the same plate/date/location as the Plate VIN sighting,
-    // so skip sighting creation entirely — no duplicate queue, no new sighting.
-    if (record.vin_source === 'Vehicle VIN') {
-      return { result: 'inserted' };
-    }
-
-    // Phase 4: Sighting
+    // Phase 3: Sighting
     const { isDup, existingSightingId } = await findDuplicateSighting(pb, vehicle.id, record);
 
     if (isDup) {
+      // Vehicle VIN rows auto-merge with existing sightings — no duplicate queue entry.
+      // For regular Plate VIN rows, queue for approver review as normal.
+      if (record.vin_source === 'Vehicle VIN') {
+        return { result: 'inserted' }; // silently merged
+      }
       await logDuplicate(pb, record, existingSightingId, batchLabel);
       return { result: 'duplicate' };
     }
@@ -316,8 +314,9 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
         const dateStr = (record.date || '').substring(0, 10);
         const sightingKey = `${record.plate}|${dateStr}|${record.location || ''}`;
         
-        // Immediate internal duplicate check
-        if (inBatchSightings.has(sightingKey)) {
+        // Internal duplicate check — but Vehicle VIN rows skip this guard
+        // so they can auto-merge inside ingestRecordCached instead of being queued.
+        if (record.vin_source !== 'Vehicle VIN' && inBatchSightings.has(sightingKey)) {
           const pendingPromise = inBatchSightings.get(sightingKey);
           const existingId = pendingPromise ? await pendingPromise : null;
           await logDuplicate(pb, record, existingId, `Internal duplicate in same batch: ${batchLabel}`);
@@ -326,7 +325,10 @@ export async function processBatch(pb, records, batchLabel, concurrency = 8) {
         
         let resolveSightingId;
         const pendingPromise = new Promise(resolve => resolveSightingId = resolve);
-        inBatchSightings.set(sightingKey, pendingPromise);
+        // Only register in the inBatchSightings map for non-Vehicle-VIN rows
+        if (record.vin_source !== 'Vehicle VIN') {
+          inBatchSightings.set(sightingKey, pendingPromise);
+        }
         
         const outcome = await ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache, sightingCache);
         
@@ -402,11 +404,6 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
     }
 
     // ── Sighting phase (cache-first, fallback to DB query) ─────────────────
-    // Vehicle VIN rows only update physical_vin_relation — skip sighting entirely.
-    if (record.vin_source === 'Vehicle VIN') {
-      return { result: 'inserted' };
-    }
-
     const dateStr = record.date ? record.date.substring(0, 10) : '';
     const cacheKey = `${vehicle.id}|${dateStr}|${record.location || ''}`;
 
@@ -426,6 +423,10 @@ async function ingestRecordCached(pb, record, batchLabel, vinCache, vehicleCache
     // If cache is populated and key is absent → not a dup (no DB call needed)
 
     if (isDup) {
+      // Vehicle VIN rows auto-merge with existing sightings — no duplicate queue.
+      if (record.vin_source === 'Vehicle VIN') {
+        return { result: 'inserted' }; // silently merged
+      }
       await logDuplicate(pb, record, existingSightingId, batchLabel);
       return { result: 'duplicate' };
     }
