@@ -32,6 +32,8 @@ export default function RecordManager() {
     switch (sb) {
       case '-date': return '-latest_sighting';
       case 'date': return 'latest_sighting';
+      case '-upload': return '-latest_upload';
+      case 'upload': return 'latest_upload';
       case '-location': return viewMode === 'vin' ? '-latest_sighting' : '-location_list';
       case 'location': return viewMode === 'vin' ? 'latest_sighting' : 'location_list';
       case '-searchable': return '-searchable';
@@ -40,7 +42,7 @@ export default function RecordManager() {
       case 'sightings': return 'sighting_count';
       case 'plate': return viewMode === 'vin' ? 'plate_list' : 'plate';
       case '-plate': return viewMode === 'vin' ? '-plate_list' : '-plate';
-      default: return sb; // plate, -plate
+      default: return sb;
     }
   };
 
@@ -519,6 +521,8 @@ export default function RecordManager() {
             >
               <option value="-date">Sighting Date (Newest)</option>
               <option value="date">Sighting Date (Oldest)</option>
+              <option value="-upload">Uploaded (Newest)</option>
+              <option value="upload">Uploaded (Oldest)</option>
               <option value="-sightings">Sightings (Most)</option>
               <option value="sightings">Sightings (Least)</option>
               {viewMode === 'plate' && <option value="plate">Plate (A-Z)</option>}
