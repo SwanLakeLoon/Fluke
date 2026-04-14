@@ -256,6 +256,18 @@
   height: auto !important;
 }
 
+/* Force selects to use theme colours — browser default overrides dark mode otherwise */
+select.input {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
+select.input option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
 .edit-actions {
   display: flex;
   gap: var(--space-sm);
