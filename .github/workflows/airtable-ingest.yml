@@ -1,0 +1,61 @@
+name: Nightly Airtable Ingest
+
+on:
+  schedule:
+    - cron: '0 11 * * *'   # 5:00 AM CST (UTC−6) = 11:00 AM UTC
+  workflow_dispatch:         # allow manual trigger from the Actions tab
+
+jobs:
+  airtable-ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60      # reg lookup can take ~10 min for 260 plates
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Playwright + Chromium
+        run: |
+          uv run --with playwright python -m playwright install chromium --with-deps
+
+      - name: Scrape Airtable view
+        run: uv run scripts/scrape_airtable.py --output /tmp/airtable_rows.json
+
+      - name: Registration lookup (DVS bulk API)
+        run: |
+          uv run scripts/reg_lookup.py \
+            --input  /tmp/airtable_rows.json \
+            --output /tmp/airtable_rows_reg.json
+        env:
+          DVS_PASSWORD: ${{ secrets.DVS_PASSWORD }}
+
+      - name: Format as Fluke CSV import template
+        run: |
+          uv run scripts/format_csv.py \
+            --input  /tmp/airtable_rows_reg.json \
+            --output /tmp/airtable_import.csv
+
+      - name: Import CSV into PocketBase
+        run: |
+          uv run scripts/import_csv.py /tmp/airtable_import.csv \
+            --batch "airtable-$(date +%Y-%m-%d)"
+        env:
+          POCKETBASE_URL:   ${{ secrets.POCKETBASE_URL }}
+          PB_ADMIN_EMAIL:   ${{ secrets.PB_ADMIN_EMAIL }}
+          PB_ADMIN_PASS:    ${{ secrets.PB_ADMIN_PASS }}
+
+      - name: Upload artifacts (for debugging)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: airtable-run-${{ github.run_id }}
+          path: |
+            /tmp/airtable_rows.json
+            /tmp/airtable_rows_reg.json
+            /tmp/airtable_import.csv
+          retention-days: 7
+
