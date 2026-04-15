@@ -12,26 +12,36 @@ export default function Locations() {
   const [saving, setSaving] = useState(null); // original_name of the one being saved
   const { refreshAliases } = useLocationAliases();
 
+  const [error, setError] = useState(null);
+
   const fetchLocations = async () => {
     setLoading(true);
+    setError(null);
+
+    // Fetch stats — independent of aliases so a failure in one doesn't hide the other
     try {
-      // Fetch stats
       const stats = await pb.collection('location_stats').getFullList({
         sort: sortBy === 'name' ? 'location' : '-sighting_count',
       });
-      
-      // Fetch current aliases
+      setLocations(stats);
+    } catch (e) {
+      console.error('Failed to fetch location_stats:', e);
+      setError(`Could not load locations: ${e?.message || e}`);
+    }
+
+    // Fetch aliases separately — non-fatal if this fails
+    try {
       const aliasRecs = await pb.collection('location_aliases').getFullList();
       const aliasMap = {};
       aliasRecs.forEach(r => {
         aliasMap[r.location] = { id: r.id, alias: r.alias };
       });
-      
-      setLocations(stats);
       setAliases(aliasMap);
     } catch (e) {
-      console.error('Failed to fetch locations:', e);
+      console.error('Failed to fetch location_aliases:', e);
+      // Don't block the UI — aliases are optional display decoration
     }
+
     setLoading(false);
   };
 
@@ -111,6 +121,13 @@ export default function Locations() {
             {filteredLocations.length} locations found
           </div>
         </div>
+
+        {error && (
+          <div className="validation-summary" style={{ marginBottom: 'var(--space-md)' }}>
+            <h3>⚠️ {error}</h3>
+            <p style={{ fontSize: '0.8rem', marginTop: 4 }}>Check the browser console for details. This may be an access rule issue on the location_stats collection.</p>
+          </div>
+        )}
 
         <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 250px)' }}>
           <table className="data-table">
