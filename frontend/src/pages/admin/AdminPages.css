@@ -268,6 +268,12 @@ select.input option {
   color: var(--text-primary);
 }
 
+/* Highlight the Filters dropdown when a filter is active */
+select.select-active {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
 .edit-actions {
   display: flex;
   gap: var(--space-sm);

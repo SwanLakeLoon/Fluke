@@ -19,8 +19,7 @@ export default function RecordManager() {
   const [selected, setSelected] = useState(new Set());
   const [filterPlate, setFilterPlate] = useState('');
   const [sortBy, setSortBy] = useState('-date');
-  const [filterVehicleVinOnly, setFilterVehicleVinOnly] = useState(false);
-  const [filterNoPlates, setFilterNoPlates] = useState(false);
+  const [activeFilter, setActiveFilter] = useState(''); // 'vehicleVin' | 'noPlates' | 'matchesRegN' | ''
   const [expandedPlates, setExpandedPlates] = useState(new Set());
   const [editingId, setEditingId] = useState(null);
   const [editingVehicleId, setEditingVehicleId] = useState(null);
@@ -52,20 +51,16 @@ export default function RecordManager() {
       const safePlate = filterPlate.replace(/"/g, '\\"');
       let statsFilter = safePlate ? (viewMode === 'vin' ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"` : `plate ~ "${safePlate}"`) : '';
       
-      // Filter to show only "NO PLATES" vehicles
-      if (filterNoPlates) {
-        const noPlatesClause = viewMode === 'vin'
-          ? 'plate_list ~ "NO PLATES"'
-          : 'plate = "NO PLATES"';
-        statsFilter = statsFilter ? `${statsFilter} && ${noPlatesClause}` : noPlatesClause;
-      }
-
-      // Filter to show only records that have a physical (Vehicle) VIN
-      if (filterVehicleVinOnly) {
-        const vinOnlyClause = viewMode === 'vin'
-          ? 'is_physical_vin = 1'
-          : 'physical_vin_relation != ""';
-        statsFilter = statsFilter ? `${statsFilter} && ${vinOnlyClause}` : vinOnlyClause;
+      // Active quick-filter
+      if (activeFilter === 'noPlates') {
+        const clause = viewMode === 'vin' ? 'plate_list ~ "NO PLATES"' : 'plate = "NO PLATES"';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
+      } else if (activeFilter === 'vehicleVin') {
+        const clause = viewMode === 'vin' ? 'is_physical_vin = 1' : 'physical_vin_relation != ""';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
+      } else if (activeFilter === 'matchesRegN') {
+        const clause = 'match_status_list ~ "N"';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
       }
       
       const statsCollection = viewMode === 'vin' ? 'enhanced_vin_stats' : 'enhanced_plate_stats';
@@ -168,7 +163,7 @@ export default function RecordManager() {
   };
 
   // eslint-disable-next-line
-  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode, filterVehicleVinOnly, filterNoPlates]); // eslint-disable-line
+  useEffect(() => { fetchRecords(); }, [page, filterPlate, sortBy, viewMode, activeFilter]); // eslint-disable-line
 
   const exportCSV = async () => {
     setExporting(true);
@@ -179,12 +174,14 @@ export default function RecordManager() {
           ? `vin ~ "${safePlate}" || plate_list ~ "${safePlate}"`
           : `plate ~ "${safePlate}"`)
         : '';
-      if (filterNoPlates) {
+      if (activeFilter === 'noPlates') {
         const clause = viewMode === 'vin' ? 'plate_list ~ "NO PLATES"' : 'plate = "NO PLATES"';
         statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
-      }
-      if (filterVehicleVinOnly) {
+      } else if (activeFilter === 'vehicleVin') {
         const clause = viewMode === 'vin' ? 'is_physical_vin = 1' : 'physical_vin_relation != ""';
+        statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
+      } else if (activeFilter === 'matchesRegN') {
+        const clause = 'match_status_list ~ "N"';
         statsFilter = statsFilter ? `${statsFilter} && ${clause}` : clause;
       }
 
@@ -532,20 +529,18 @@ export default function RecordManager() {
               <option value="-searchable">Searchable (Yes first)</option>
               <option value="searchable">Searchable (No first)</option>
             </select>
-            <button
-              className={`btn btn-sm ${filterVehicleVinOnly ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => { setFilterVehicleVinOnly(v => !v); setPage(1); }}
-              title="Show only vehicles with a physical (dash-inspected) VIN"
+            <select
+              className={`select ${activeFilter ? 'select-active' : ''}`}
+              value={activeFilter}
+              onChange={(e) => { setActiveFilter(e.target.value); setPage(1); }}
+              title="Quick filters"
+              style={{ minWidth: '160px' }}
             >
-              🚗 Vehicle VINs only
-            </button>
-            <button
-              className={`btn btn-sm ${filterNoPlates ? 'btn-primary' : 'btn-ghost'}`}
-              onClick={() => { setFilterNoPlates(v => !v); setPage(1); }}
-              title="Show only records where no plate was found"
-            >
-              ❓ No Plates
-            </button>
+              <option value="">Filters</option>
+              <option value="vehicleVin">🚗 Vehicle VINs only</option>
+              <option value="noPlates">❓ No Plates</option>
+              <option value="matchesRegN">⚠️ Matches Reg = N</option>
+            </select>
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
               {totalItems} total records
             </span>

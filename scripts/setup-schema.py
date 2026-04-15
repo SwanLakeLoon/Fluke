@@ -200,6 +200,11 @@ def main():
         make_collection(c, token, names, "location_stats", {
             "name": "location_stats", "type": "view",
             "viewQuery": "SELECT (ROW_NUMBER() OVER()) as id, location, COUNT(*) as sighting_count FROM sightings WHERE location != '' GROUP BY location",
+            # Fields are required by PocketBase for view collections — omitting causes validation_required error
+            "fields": [
+                {"name": "location",       "type": "text",   "required": False, "max": 500},
+                {"name": "sighting_count", "type": "number", "required": False},
+            ],
         })
 
         print("\n🔧 Applying API access rules...")
@@ -251,7 +256,9 @@ def main():
             "deleteRule": '@request.auth.role ?= "admin"'
         })
 
-        admin_only_rule = '@request.auth.role ?= "admin"'
+        # Use = (not ?=) for plain text role field — ?= is for multi-value/relation fields
+        # and silently returns no results on scalar text fields in some PocketBase versions.
+        admin_only_rule = '@request.auth.role = "admin"'
         safe_patch("location_aliases", {
             "listRule": '@request.auth.id != ""',   # Any authed user can READ (required for redaction to work)
             "viewRule": '@request.auth.id != ""',
