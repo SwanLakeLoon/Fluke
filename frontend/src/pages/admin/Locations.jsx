@@ -572,7 +572,7 @@ export default function Locations() {
                 <thead>
                   <tr>
                     <th>
-                      <span className="th-label" title="Your standardized location name. Only admins can see this real name.">
+                      <span className="th-label" title="Your standardized location name. When aliased, only admins can see this real name.">
                         Canonical Location <span className="th-hint">ⓘ</span>
                       </span>
                     </th>
