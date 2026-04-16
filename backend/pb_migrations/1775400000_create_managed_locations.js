@@ -12,9 +12,9 @@ migrate((app) => {
     "system":     false,
     "listRule":   '@request.auth.id != ""',
     "viewRule":   '@request.auth.id != ""',
-    "createRule": '@request.auth.role = "admin"',
-    "updateRule": '@request.auth.role = "admin"',
-    "deleteRule": '@request.auth.role = "admin"',
+    "createRule": '@request.auth.role ?= "admin"',
+    "updateRule": '@request.auth.role ?= "admin"',
+    "deleteRule": '@request.auth.role ?= "admin"',
     "fields": [
       {
         "autogeneratePattern": "",
@@ -58,11 +58,11 @@ migrate((app) => {
     "name":       "location_mappings",
     "type":       "base",
     "system":     false,
-    "listRule":   '@request.auth.role = "admin"',
-    "viewRule":   '@request.auth.role = "admin"',
-    "createRule": '@request.auth.role = "admin"',
-    "updateRule": '@request.auth.role = "admin"',
-    "deleteRule": '@request.auth.role = "admin"',
+    "listRule":   '@request.auth.role ?= "admin"',
+    "viewRule":   '@request.auth.role ?= "admin"',
+    "createRule": '@request.auth.role ?= "admin"',
+    "updateRule": '@request.auth.role ?= "admin"',
+    "deleteRule": '@request.auth.role ?= "admin"',
     "fields": [
       {
         "autogeneratePattern": "",

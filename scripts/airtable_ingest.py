@@ -40,6 +40,11 @@ PB_PASS   = os.environ.get("PB_ADMIN_PASS",   "admin123456")
 IMPORT_SOURCE = "airtable-hot-dishes"
 
 
+def _esc(val: str) -> str:
+    """Escape a value for use inside a PocketBase filter string."""
+    return val.replace('\\', '\\\\').replace('"', '\\"')
+
+
 # ── PocketBase auth ─────────────────────────────────────────────────────────────
 
 def pb_auth(client: httpx.Client) -> str:
@@ -67,7 +72,7 @@ def upsert_vehicle(client: httpx.Client, headers: dict, row: dict,
     try:
         resp = client.get(
             f"{PB_URL}/api/collections/vehicles/records",
-            params={"filter": f'plate = "{plate}"', "perPage": 1},
+            params={"filter": f'plate = "{_esc(plate)}"', "perPage": 1},
             headers=headers,
         )
         resp.raise_for_status()
@@ -113,7 +118,7 @@ def is_duplicate_sighting(client: httpx.Client, headers: dict,
                            vehicle_id: str, dt: str, location: str) -> bool:
     """True if a sighting for this vehicle+date+location already exists."""
     date_prefix = dt[:10]  # "YYYY-MM-DD"
-    filter_str  = f'vehicle = "{vehicle_id}" && location = "{location}"'
+    filter_str  = f'vehicle = "{vehicle_id}" && location = "{_esc(location)}"'
     try:
         resp = client.get(
             f"{PB_URL}/api/collections/sightings/records",

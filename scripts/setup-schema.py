@@ -29,8 +29,8 @@ PB_URL = os.environ.get("POCKETBASE_URL", "http://127.0.0.1:8090")
 ADMIN_EMAIL = os.environ.get("PB_ADMIN_EMAIL", "admin@local.dev")
 ADMIN_PASS = os.environ.get("PB_ADMIN_PASS", "admin123456")
 
-ADMIN_RULE = '(@request.auth.id != "" && searchable = true) || @request.auth.role = "admin"'
-APPROVER_RULE = '@request.auth.role = "admin" || @request.auth.role = "approver"'
+ADMIN_RULE = '(@request.auth.id != "" && searchable = true) || @request.auth.role ?= "admin"'
+APPROVER_RULE = '@request.auth.role ?= "admin" || @request.auth.role ?= "approver"'
 
 
 def api(client: httpx.Client, path: str, method: str = "GET", json_data=None, token: str | None = None):
@@ -168,13 +168,7 @@ def main():
             ],
         })
 
-        # 8. plate_stats
-        make_collection(c, token, names, "plate_stats", {
-            "id": "pbcplatestats00", "name": "plate_stats", "type": "view",
-            "viewQuery": "SELECT v.id as id, v.plate as plate, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting FROM vehicles v LEFT JOIN sightings s ON s.vehicle = v.id GROUP BY v.id",
-        })
-
-        # 9. enhanced_plate_stats
+        # 8. enhanced_plate_stats (plate_stats was removed — this is the canonical plate view)
         make_collection(c, token, names, "enhanced_plate_stats", {
             "id": "pbcplatestatsen", "name": "enhanced_plate_stats", "type": "view",
             "viewQuery": "SELECT v.id as id, v.plate as plate, COUNT(s.id) as sighting_count, MAX(s.date) as latest_sighting, MAX(s.created) as latest_upload, MAX(v.state) as state_list, GROUP_CONCAT(s.ice) as ice_list, MAX(vi.vin) as vin_list, MAX(pvi.vin) as physical_vin_list, GROUP_CONCAT(s.location) as location_list, GROUP_CONCAT(s.match_status) as match_status_list, MAX(v.searchable) as searchable, MAX(v.physical_vin_relation) as physical_vin_relation FROM vehicles v LEFT JOIN sightings s ON s.vehicle = v.id LEFT JOIN vins vi ON v.vin_relation = vi.id LEFT JOIN vins pvi ON v.physical_vin_relation = pvi.id GROUP BY v.id",
@@ -238,7 +232,7 @@ def main():
                 api(c, f"/api/collections/{colObj['id']}", "PATCH", rulePayload, token=token)
                 print(f"  ✅ {colName} rules updated")
 
-        for c_name in ["vins", "vehicles", "sightings", "plate_stats", "enhanced_plate_stats", "enhanced_vin_stats"]:
+        for c_name in ["vins", "vehicles", "sightings", "enhanced_plate_stats", "enhanced_vin_stats"]:
             if c_name in ["vehicles", "enhanced_plate_stats", "enhanced_vin_stats"]:
                 list_view = '(@request.auth.id != "" && searchable = true) || @request.auth.role ?= "admin"'
             elif c_name == "sightings":
@@ -246,7 +240,7 @@ def main():
             else:
                 list_view = '(@request.auth.id != "") || @request.auth.role ?= "admin"'
                 
-            is_view = c_name in ["plate_stats", "enhanced_plate_stats", "enhanced_vin_stats"]
+            is_view = c_name in ["enhanced_plate_stats", "enhanced_vin_stats"]
             cu_rule = None if is_view else '@request.auth.role ?= "admin" || @request.auth.role ?= "approver"'
             
             safe_patch(c_name, {
@@ -275,9 +269,8 @@ def main():
             "deleteRule": '@request.auth.role ?= "admin"'
         })
 
-        # Use = (not ?=) for plain text role field — ?= is for multi-value/relation fields
-        # and silently returns no results on scalar text fields in some PocketBase versions.
-        admin_only_rule = '@request.auth.role = "admin"'
+        # role is a 'select' field — must use ?= operator (= silently fails for select fields)
+        admin_only_rule = '@request.auth.role ?= "admin"'
         safe_patch("location_aliases", {
             "listRule": '@request.auth.id != ""',   # Any authed user can READ (required for redaction to work)
             "viewRule": '@request.auth.id != ""',

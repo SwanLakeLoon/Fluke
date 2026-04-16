@@ -50,9 +50,9 @@ def create_managed_locations(client: httpx.Client, token: str):
             "type": "base",
             "listRule":   '@request.auth.id != ""',
             "viewRule":   '@request.auth.id != ""',
-            "createRule": '@request.auth.role = "admin"',
-            "updateRule": '@request.auth.role = "admin"',
-            "deleteRule": '@request.auth.role = "admin"',
+            "createRule": '@request.auth.role ?= "admin"',
+            "updateRule": '@request.auth.role ?= "admin"',
+            "deleteRule": '@request.auth.role ?= "admin"',
             "fields": [
                 {"name": "name", "type": "text", "required": True, "min": 1, "max": 500, "presentable": True},
             ],
@@ -77,11 +77,11 @@ def create_location_mappings(client: httpx.Client, token: str, managed_col_id: s
         json={
             "name": "location_mappings",
             "type": "base",
-            "listRule":   '@request.auth.role = "admin"',
-            "viewRule":   '@request.auth.role = "admin"',
-            "createRule": '@request.auth.role = "admin"',
-            "updateRule": '@request.auth.role = "admin"',
-            "deleteRule": '@request.auth.role = "admin"',
+            "listRule":   '@request.auth.role ?= "admin"',
+            "viewRule":   '@request.auth.role ?= "admin"',
+            "createRule": '@request.auth.role ?= "admin"',
+            "updateRule": '@request.auth.role ?= "admin"',
+            "deleteRule": '@request.auth.role ?= "admin"',
             "fields": [
                 {"name": "raw_value",         "type": "text",     "required": True, "min": 1, "max": 500, "presentable": True},
                 {"name": "managed_location",  "type": "relation", "required": True, "collectionId": managed_col_id, "maxSelect": 1},
@@ -120,9 +120,9 @@ def main():
                 json={
                     "listRule":   '@request.auth.id != ""',
                     "viewRule":   '@request.auth.id != ""',
-                    "createRule": '@request.auth.role = "admin"',
-                    "updateRule": '@request.auth.role = "admin"',
-                    "deleteRule": '@request.auth.role = "admin"',
+                    "createRule": '@request.auth.role ?= "admin"',
+                    "updateRule": '@request.auth.role ?= "admin"',
+                    "deleteRule": '@request.auth.role ?= "admin"',
                 },
             )
             if patch_resp.is_success:
@@ -139,11 +139,11 @@ def main():
                 f"{PB_URL}/api/collections/location_mappings",
                 headers={"Authorization": token},
                 json={
-                    "listRule":   '@request.auth.role = "admin"',
-                    "viewRule":   '@request.auth.role = "admin"',
-                    "createRule": '@request.auth.role = "admin"',
-                    "updateRule": '@request.auth.role = "admin"',
-                    "deleteRule": '@request.auth.role = "admin"',
+                    "listRule":   '@request.auth.role ?= "admin"',
+                    "viewRule":   '@request.auth.role ?= "admin"',
+                    "createRule": '@request.auth.role ?= "admin"',
+                    "updateRule": '@request.auth.role ?= "admin"',
+                    "deleteRule": '@request.auth.role ?= "admin"',
                 },
             )
             if patch_resp.is_success:

@@ -19,6 +19,12 @@ Usage from Python:
 
 import httpx
 
+
+def _esc(val: str) -> str:
+    """Escape a value for use inside a PocketBase filter string.
+    Prevents filter injection from user-provided data containing quotes."""
+    return val.replace('\\', '\\\\').replace('"', '\\"')
+
 # ---------- constants ----------
 
 COLUMN_MAP = {
@@ -219,7 +225,7 @@ def process_csv_rows(
                         # Try to find existing VIN
                         check = client.get(
                             f"{pb_url}/api/collections/vins/records",
-                            params={"filter": f'vin = "{vin_str}"', "perPage": 1},
+                            params={"filter": f'vin = "{_esc(vin_str)}"', "perPage": 1},
                             headers=headers,
                         )
                         items = check.json().get("items", [])
@@ -256,7 +262,7 @@ def process_csv_rows(
                 try:
                     check = client.get(
                         f"{pb_url}/api/collections/vehicles/records",
-                        params={"filter": f'plate = "{plate}"', "perPage": 1},
+                        params={"filter": f'plate = "{_esc(plate)}"', "perPage": 1},
                         headers=headers,
                     )
                     items = check.json().get("items", [])
@@ -307,7 +313,7 @@ def process_csv_rows(
 
             filter_parts = [f'vehicle = "{vehicle_id}"']
             if location:
-                filter_parts.append(f'location = "{location}"')
+                filter_parts.append(f'location = "{_esc(location)}"')
             else:
                 filter_parts.append('location = ""')
 
