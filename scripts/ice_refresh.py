@@ -33,8 +33,10 @@ import asyncio
 import json
 import os
 import sys
+import time
 import urllib.parse
 from datetime import datetime, timezone
+from functools import wraps
 
 import httpx
 
@@ -58,9 +60,26 @@ DEFROST_HEADERS = {
     ),
 }
 
+# ── PocketBase Resiliency ─────────────────────────────────────────────────────
+def with_pb_retry(max_retries=4):
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            for attempt in range(max_retries):
+                try:
+                    return func(*args, **kwargs)
+                except httpx.RequestError as e:
+                    if attempt == max_retries - 1:
+                        raise
+                    print(f"  ⚠️ PB request dropped ({type(e).__name__}) — retrying {attempt+1}/{max_retries}...")
+                    time.sleep(1 + attempt)
+        return wrapper
+    return decorator
+
 
 # ── PocketBase helpers ────────────────────────────────────────────────────────
 
+@with_pb_retry()
 def pb_auth(client: httpx.Client) -> str:
     resp = client.post(
         f"{PB_URL}/api/collections/_superusers/auth-with-password",
@@ -70,6 +89,7 @@ def pb_auth(client: httpx.Client) -> str:
     return resp.json()["token"]
 
 
+@with_pb_retry()
 def pb_get_all_vehicles(client: httpx.Client, token: str) -> list[dict]:
     """Return list of {id, plate} for every vehicle."""
     vehicles = []
@@ -89,6 +109,7 @@ def pb_get_all_vehicles(client: httpx.Client, token: str) -> list[dict]:
     return vehicles
 
 
+@with_pb_retry()
 def pb_get_latest_ice(client: httpx.Client, token: str, vehicle_id: str) -> str | None:
     """Return the ICE value from the most recent sighting for this vehicle."""
     resp = client.get(
@@ -106,6 +127,7 @@ def pb_get_latest_ice(client: httpx.Client, token: str, vehicle_id: str) -> str 
     return items[0]["ice"] if items else None
 
 
+@with_pb_retry()
 def pb_update_all_sightings(client: httpx.Client, token: str, vehicle_id: str, new_ice: str) -> int:
     """Set ice on ALL sightings for this vehicle. Returns count updated."""
     resp = client.get(
@@ -124,6 +146,7 @@ def pb_update_all_sightings(client: httpx.Client, token: str, vehicle_id: str, n
     return len(sightings)
 
 
+@with_pb_retry()
 def pb_update_vehicle_searchable(client: httpx.Client, token: str, vehicle_id: str, new_ice: str):
     searchable = new_ice in ("Y", "HS")
     client.patch(
@@ -133,6 +156,7 @@ def pb_update_vehicle_searchable(client: httpx.Client, token: str, vehicle_id: s
     ).raise_for_status()
 
 
+@with_pb_retry()
 def pb_log_change(client: httpx.Client, token: str, plate: str, old_ice: str, new_ice: str,
                    sightings_updated: int):
     client.post(
