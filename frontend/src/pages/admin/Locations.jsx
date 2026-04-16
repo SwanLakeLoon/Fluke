@@ -36,24 +36,42 @@ export default function Locations() {
     setLoading(true);
     setError(null);
 
-    try {
-      const [managed, mappings, stats, aliasRecs] = await Promise.all([
-        pb.collection('managed_locations').getFullList({ sort: 'name' }),
-        pb.collection('location_mappings').getFullList({ expand: 'managed_location' }),
-        pb.collection('location_stats').getFullList({ sort: '-sighting_count' }),
-        pb.collection('location_aliases').getFullList(),
-      ]);
-      setManagedLocations(managed);
-      setLocationMappings(mappings);
-      setLocationStats(stats);
+    // Each collection is fetched independently — a missing collection (404)
+    // should not prevent the rest of the page from loading.
+    let managed = [], mappings = [], stats = [], aliasRecs = [];
 
-      const am = {};
-      aliasRecs.forEach(r => { am[r.location] = { id: r.id, alias: r.alias }; });
-      setAliases(am);
+    try {
+      managed = await pb.collection('managed_locations').getFullList({ sort: 'name' });
     } catch (e) {
-      console.error('Failed to load location data:', e);
-      setError(`Could not load location data: ${e?.message || e}`);
+      console.warn('managed_locations not available:', e?.message);
     }
+
+    try {
+      mappings = await pb.collection('location_mappings').getFullList({ expand: 'managed_location' });
+    } catch (e) {
+      console.warn('location_mappings not available:', e?.message);
+    }
+
+    try {
+      stats = await pb.collection('location_stats').getFullList({ sort: '-sighting_count' });
+    } catch (e) {
+      console.error('Failed to fetch location_stats:', e);
+      setError(`Could not load location stats: ${e?.message || e}`);
+    }
+
+    try {
+      aliasRecs = await pb.collection('location_aliases').getFullList();
+    } catch (e) {
+      console.warn('location_aliases not available:', e?.message);
+    }
+
+    setManagedLocations(managed);
+    setLocationMappings(mappings);
+    setLocationStats(stats);
+
+    const am = {};
+    aliasRecs.forEach(r => { am[r.location] = { id: r.id, alias: r.alias }; });
+    setAliases(am);
 
     setLoading(false);
   }, []);
