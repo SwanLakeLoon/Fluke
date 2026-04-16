@@ -201,6 +201,33 @@ def main():
         skipped    = 0
         errors     = 0
 
+        # Location auto-normalization: fetch mappings once
+        location_map: dict[str, str] = {}  # raw_value → canonical name
+        try:
+            pg = 1
+            while True:
+                resp = client.get(
+                    f"{PB_URL}/api/collections/location_mappings/records",
+                    params={"perPage": 200, "page": pg, "expand": "managed_location"},
+                    headers=headers,
+                )
+                if resp.is_success:
+                    data = resp.json()
+                    for item in data.get("items", []):
+                        raw = item.get("raw_value", "")
+                        canonical = item.get("expand", {}).get("managed_location", {}).get("name", "")
+                        if raw and canonical:
+                            location_map[raw] = canonical
+                    if pg >= data.get("totalPages", 1):
+                        break
+                    pg += 1
+                else:
+                    break
+        except Exception:
+            pass  # location normalization is best-effort
+        if location_map:
+            print(f"📍  Loaded {len(location_map)} location mappings for auto-normalization")
+
         for i, row in enumerate(valid_rows, 1):
             plate = row["plate"]
 
@@ -208,6 +235,11 @@ def main():
             if not vehicle_id:
                 errors += 1
                 continue
+
+            # Auto-normalize location before duplicate check
+            raw_loc = row.get("location", "")
+            if raw_loc and raw_loc in location_map:
+                row["location"] = location_map[raw_loc]
 
             if is_duplicate_sighting(client, headers, vehicle_id,
                                      row.get("date", ""), row.get("location", "")):

@@ -207,6 +207,25 @@ def main():
             ],
         })
 
+        # 13. managed_locations — admin-curated canonical location names
+        make_collection(c, token, names, "managed_locations", {
+            "id": "pbc_managed_locs", "name": "managed_locations", "type": "base",
+            "indexes": ["CREATE UNIQUE INDEX idx_managed_locations_name ON managed_locations (name)"],
+            "fields": [
+                {"name": "name", "type": "text", "required": True, "min": 1, "max": 500, "presentable": True},
+            ],
+        })
+
+        # 14. location_mappings — maps raw DB strings to canonical managed locations
+        make_collection(c, token, names, "location_mappings", {
+            "id": "pbc_loc_mappings", "name": "location_mappings", "type": "base",
+            "indexes": ["CREATE UNIQUE INDEX idx_location_mappings_raw ON location_mappings (raw_value)"],
+            "fields": [
+                {"name": "raw_value",        "type": "text",     "required": True, "min": 1, "max": 500, "presentable": True},
+                {"name": "managed_location", "type": "relation", "required": True, "collectionId": "pbc_managed_locs", "maxSelect": 1},
+            ],
+        })
+
         print("\n🔧 Applying API access rules...")
         
         # Fresh collection snapshot for rule mapping
@@ -269,6 +288,20 @@ def main():
 
         safe_patch("location_stats", {
             "listRule": admin_only_rule, "viewRule": admin_only_rule
+        })
+
+        safe_patch("managed_locations", {
+            "listRule": '@request.auth.id != ""',
+            "viewRule": '@request.auth.id != ""',
+            "createRule": admin_only_rule,
+            "updateRule": admin_only_rule,
+            "deleteRule": admin_only_rule
+        })
+
+        safe_patch("location_mappings", {
+            "listRule": admin_only_rule, "viewRule": admin_only_rule,
+            "createRule": admin_only_rule, "updateRule": admin_only_rule,
+            "deleteRule": admin_only_rule
         })
 
         if users_col:

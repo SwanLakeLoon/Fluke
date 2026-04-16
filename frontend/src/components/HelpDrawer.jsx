@@ -134,6 +134,32 @@ export default function HelpDrawer({ isOpen, onClose }) {
               </details>
 
               <details className="help-section">
+                <summary>📍 Location Management</summary>
+                <div className="help-section-content">
+                  <p style={{ marginBottom: '0.75rem' }}>
+                    The <strong>Locations</strong> page has two panels. Use the toggle at the top to switch between them.
+                  </p>
+
+                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>🏢 Manage Locations</div>
+                  <ul style={{ marginBottom: '1rem' }}>
+                    <li>Curate a list of <strong>canonical location names</strong>. Raw location values from CSV uploads and automated scrapers often contain typos and formatting inconsistencies.</li>
+                    <li>Expand a managed location to see <strong>unmapped raw values</strong> from the database. Select the ones that refer to the same place, then click <strong>Normalize</strong> to batch-rewrite sighting records.</li>
+                    <li>Future imports will <strong>auto-normalize</strong> using your saved mappings — no need to re-normalize the same raw values.</li>
+                    <li>Use the <strong>✕</strong> button on a mapped value chip to stop auto-normalizing that raw string in the future. Already-normalized records are not reverted.</li>
+                    <li><strong>Rename:</strong> Updates all sighting records and aliases to reflect the new canonical name.</li>
+                    <li><strong>Delete:</strong> Removes the managed location and its mappings but leaves existing sighting records as-is.</li>
+                  </ul>
+
+                  <div style={{ fontWeight: 600, marginBottom: '0.4rem' }}>🏷️ Location Aliases</div>
+                  <ul>
+                    <li>Assign a <strong>privacy redaction label</strong> to any managed location.</li>
+                    <li>Non-admin users will see the alias (e.g. "Known ICE HOTEL") instead of the real location name in search results.</li>
+                    <li>Aliases apply to <strong>managed (canonical) names</strong>. Normalize your locations first, then assign aliases.</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details className="help-section">
                 <summary>👥 User Manager</summary>
                 <div className="help-section-content">
                   <ul>

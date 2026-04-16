@@ -160,6 +160,33 @@ def process_csv_rows(
         vin_cache: dict[str, str | None] = {}     # vin string → vin record id
         vehicle_cache: dict[str, str | None] = {}  # plate → vehicle record id
 
+        # Location auto-normalization: fetch mappings once
+        location_map: dict[str, str] = {}  # raw_value → canonical name
+        try:
+            page = 1
+            while True:
+                resp = client.get(
+                    f"{pb_url}/api/collections/location_mappings/records",
+                    params={"perPage": 200, "page": page, "expand": "managed_location"},
+                    headers=headers,
+                )
+                if resp.is_success:
+                    data = resp.json()
+                    for item in data.get("items", []):
+                        raw = item.get("raw_value", "")
+                        canonical = item.get("expand", {}).get("managed_location", {}).get("name", "")
+                        if raw and canonical:
+                            location_map[raw] = canonical
+                    if page >= data.get("totalPages", 1):
+                        break
+                    page += 1
+                else:
+                    break
+        except Exception:
+            pass  # location normalization is best-effort
+        if location_map:
+            print(f"📍  Loaded {len(location_map)} location mappings for auto-normalization")
+
         for i, csv_row in enumerate(rows, start=1):
             # 1. Map columns
             mapped = map_row(csv_row)
@@ -173,6 +200,11 @@ def process_csv_rows(
 
             # 3. Build record
             record = build_record(mapped)
+
+            # 3a. Auto-normalize location if a mapping exists
+            raw_loc = record.get("location", "")
+            if raw_loc and raw_loc in location_map:
+                record["location"] = location_map[raw_loc]
 
             # 4. VIN phase — find or create VIN record
             vin_relation_id = None

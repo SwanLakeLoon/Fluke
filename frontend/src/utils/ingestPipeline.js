@@ -186,6 +186,31 @@ export async function ingestRecord(pb, record, batchLabel) {
 }
 
 export async function processBatch(pb, records, batchLabel, concurrency = 8) {
+  // ── Phase 0: location auto-normalization ──────────────────────────────────
+  // Fetch all location_mappings once and rewrite record locations in-place.
+  // This is best-effort — if the collection doesn't exist yet, we skip silently.
+  try {
+    const mappings = await pb.collection('location_mappings').getFullList({
+      expand: 'managed_location',
+    });
+    const locationMap = new Map(); // raw_value → canonical name
+    for (const m of mappings) {
+      const raw = m.raw_value;
+      const canonical = m.expand?.managed_location?.name;
+      if (raw && canonical) locationMap.set(raw, canonical);
+    }
+    if (locationMap.size > 0) {
+      for (const record of records) {
+        const loc = record.location || '';
+        if (loc && locationMap.has(loc)) {
+          record.location = locationMap.get(loc);
+        }
+      }
+    }
+  } catch {
+    // Non-fatal: collection may not exist in older deployments
+  }
+
   // ── Phase 1: build VIN cache ─────────────────────────────────────────────
   const uniqueVins = [...new Set(records.map(r => r.vin).filter(Boolean))];
   const vinCache = new Map(); // vin string → vin record
