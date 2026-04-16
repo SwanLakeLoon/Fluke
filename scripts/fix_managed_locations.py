@@ -110,18 +110,60 @@ def main():
 
         # managed_locations
         if collection_exists(client, token, "managed_locations"):
-            print("ℹ️  managed_locations already exists — skipping")
-            # fetch its id for the relation
+            print("ℹ️  managed_locations already exists — verifying rules")
             resp = client.get(f"{PB_URL}/api/collections/managed_locations", headers={"Authorization": token})
             managed_col_id = resp.json()["id"]
+            # Patch rules to ensure correctness
+            patch_resp = client.patch(
+                f"{PB_URL}/api/collections/managed_locations",
+                headers={"Authorization": token},
+                json={
+                    "listRule":   '@request.auth.id != ""',
+                    "viewRule":   '@request.auth.id != ""',
+                    "createRule": '@request.auth.role = "admin"',
+                    "updateRule": '@request.auth.role = "admin"',
+                    "deleteRule": '@request.auth.role = "admin"',
+                },
+            )
+            if patch_resp.is_success:
+                print("  ✅ Rules verified/updated")
+            else:
+                print(f"  ⚠️ Rule patch failed: {patch_resp.status_code} {patch_resp.text}")
         else:
             managed_col_id = create_managed_locations(client, token)
 
         # location_mappings
         if collection_exists(client, token, "location_mappings"):
-            print("ℹ️  location_mappings already exists — skipping")
+            print("ℹ️  location_mappings already exists — verifying rules")
+            patch_resp = client.patch(
+                f"{PB_URL}/api/collections/location_mappings",
+                headers={"Authorization": token},
+                json={
+                    "listRule":   '@request.auth.role = "admin"',
+                    "viewRule":   '@request.auth.role = "admin"',
+                    "createRule": '@request.auth.role = "admin"',
+                    "updateRule": '@request.auth.role = "admin"',
+                    "deleteRule": '@request.auth.role = "admin"',
+                },
+            )
+            if patch_resp.is_success:
+                print("  ✅ Rules verified/updated")
+            else:
+                print(f"  ⚠️ Rule patch failed: {patch_resp.status_code} {patch_resp.text}")
         else:
             create_location_mappings(client, token, managed_col_id)
+
+        # Quick verification — try listing both as admin
+        for name in ("managed_locations", "location_mappings"):
+            resp = client.get(
+                f"{PB_URL}/api/collections/{name}/records?perPage=1",
+                headers={"Authorization": token},
+            )
+            if resp.is_success:
+                total = resp.json().get("totalItems", "?")
+                print(f"  ✅ {name} accessible — {total} records")
+            else:
+                print(f"  ❌ {name} NOT accessible: {resp.status_code} {resp.text}")
 
         print("\n🎉 Done!")
 

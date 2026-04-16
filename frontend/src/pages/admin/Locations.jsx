@@ -98,16 +98,22 @@ export default function Locations() {
     locationMappings.filter(m => m.managed_location === managedId);
 
   // ── Manage: Create ────────────────────────────────────────────────────────
+  const [creating, setCreating] = useState(false);
   const handleCreate = async () => {
     const name = newLocName.trim();
     if (!name) return;
+    setCreating(true);
     try {
-      await pb.collection('managed_locations').create({ name });
+      console.log('[Locations] Creating managed location:', name);
+      const created = await pb.collection('managed_locations').create({ name });
+      console.log('[Locations] Created:', created);
       setNewLocName('');
-      fetchAll();
+      await fetchAll();
     } catch (e) {
-      alert(`Failed to create: ${e?.message || e}`);
+      console.error('[Locations] Create failed:', e);
+      alert(`Failed to create location: ${e?.data?.data?.name?.message || e?.message || JSON.stringify(e)}`);
     }
+    setCreating(false);
   };
 
   // ── Manage: Rename ────────────────────────────────────────────────────────
@@ -322,8 +328,8 @@ export default function Locations() {
                   onKeyDown={e => e.key === 'Enter' && handleCreate()}
                   style={{ maxWidth: '350px' }}
                 />
-                <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newLocName.trim()}>
-                  + Add Location
+                <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={!newLocName.trim() || creating}>
+                  {creating ? '⏳ Creating...' : '+ Add Location'}
                 </button>
               </div>
               <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
