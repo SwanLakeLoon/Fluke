@@ -619,6 +619,7 @@ export default function Locations() {
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         {/* ══════════════ MODALS ══════════════ */}
