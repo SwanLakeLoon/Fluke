@@ -608,7 +608,7 @@ export default function Locations() {
                           disabled={savingAlias === ml.name}
                           style={{ minWidth: '220px' }}
                         >
-                          <option value="">No Alias (Show real name)</option>
+                          <option value="">Choose an alias</option>
                           {ALIAS_VALUES.map(v => <option key={v} value={v}>{v}</option>)}
                         </select>
                         {savingAlias === ml.name && <span style={{ fontSize: '0.8rem' }}>⌛</span>}
