@@ -317,8 +317,23 @@ export default function Locations() {
         {/* ══════════════ MANAGE LOCATIONS TAB ══════════════ */}
         {tab === 'manage' && (
           <>
+            {/* Explanatory intro */}
+            <div style={{
+              margin: 'var(--space-md) 0',
+              padding: 'var(--space-sm) var(--space-md)',
+              background: 'rgba(var(--accent-rgb, 99, 102, 241), 0.06)',
+              borderRadius: 'var(--radius-md)',
+              borderLeft: '3px solid var(--accent)',
+              fontSize: '0.88rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}>
+              <strong>How it works:</strong> Create your preferred location names below, then map messy raw values from imported data to them.
+              When you normalize, all matching sighting records are rewritten to use your canonical name — and future imports will auto-normalize using your saved mappings.
+            </div>
+
             {/* Add new location */}
-            <div className="records-toolbar" style={{ marginTop: 'var(--space-md)' }}>
+            <div className="records-toolbar">
               <div className="records-toolbar-left">
                 <input
                   className="input"
@@ -338,14 +353,30 @@ export default function Locations() {
             </div>
 
             {/* Managed locations table */}
-            <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 280px)', marginTop: 'var(--space-md)' }}>
+            <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 320px)', marginTop: 'var(--space-md)' }}>
               <table className="data-table">
                 <thead>
                   <tr>
-                    <th>Canonical Name</th>
-                    <th>Sighting Count</th>
-                    <th>Mapped Raw Values</th>
-                    <th>Actions</th>
+                    <th>
+                      <span className="th-label" title="The standardized location name you define. All sightings mapped to this location will display this exact name.">
+                        Canonical Name <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                    <th>
+                      <span className="th-label" title="The number of sighting records currently stored with this exact location name in the database.">
+                        Sighting Count <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                    <th>
+                      <span className="th-label" title="Raw location strings from imported data that have been mapped to this canonical name. Future imports containing these values will be auto-normalized.">
+                        Mapped Raw Values <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                    <th>
+                      <span className="th-label" title="Map: select raw values to absorb. Rename: update the canonical name across all records. Delete: remove this managed location.">
+                        Actions <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -425,8 +456,14 @@ export default function Locations() {
                         {isExpanded && (
                           <tr>
                             <td colSpan="4" style={{ padding: 'var(--space-md)', background: 'rgba(var(--accent-rgb, 99, 102, 241), 0.05)' }}>
-                              <div style={{ marginBottom: 'var(--space-sm)', fontWeight: 600, fontSize: '0.9rem' }}>
-                                Unmapped raw values — select values to absorb into "{ml.name}"
+                              <div style={{ marginBottom: 'var(--space-sm)' }}>
+                                <div style={{ fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.2rem' }}>
+                                  Map unstandardized values to "{ml.name}"
+                                </div>
+                                <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                                  Select the raw imports below that should be rolled up into this canonical location. 
+                                  Normalizing will permanently update the sighting records to use <strong>{ml.name}</strong>.
+                                </div>
                               </div>
                               {unmappedStats.length === 0 ? (
                                 <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -504,15 +541,43 @@ export default function Locations() {
 
         {/* ══════════════ LOCATION ALIASES TAB ══════════════ */}
         {tab === 'aliases' && (
-          <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 220px)', marginTop: 'var(--space-md)' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Canonical Location</th>
-                  <th>Sighting Count</th>
-                  <th>Redaction Alias</th>
-                </tr>
-              </thead>
+          <>
+            {/* Explanatory intro */}
+            <div style={{
+              margin: 'var(--space-md) 0',
+              padding: 'var(--space-sm) var(--space-md)',
+              background: 'rgba(var(--accent-rgb, 99, 102, 241), 0.06)',
+              borderRadius: 'var(--radius-md)',
+              borderLeft: '3px solid var(--accent)',
+              fontSize: '0.88rem',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+            }}>
+              <strong>How it works:</strong> Assign privacy redaction aliases to your managed locations.
+              When non-admin users view records in the registry, the real canonical name will be hidden and replaced by the alias you select here.
+            </div>
+
+            <div className="glass-card" style={{ padding: 0, overflow: 'auto', maxHeight: 'calc(100vh - 270px)', marginTop: 'var(--space-md)' }}>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>
+                      <span className="th-label" title="Your standardized location name. Only admins can see this real name.">
+                        Canonical Location <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                    <th>
+                      <span className="th-label" title="The number of sighting records currently tied to this canonical location.">
+                        Sighting Count <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                    <th>
+                      <span className="th-label" title="The generic privacy label that regular users will see instead of the real location name.">
+                        Redaction Alias <span className="th-hint">ⓘ</span>
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
               <tbody>
                 {loading ? (
                   <tr><td colSpan="3" style={{ textAlign: 'center', padding: '2rem' }}>Loading...</td></tr>

@@ -310,3 +310,22 @@ select.select-active {
 @media (max-width: 480px) {
   .edit-grid { grid-template-columns: 1fr; }
 }
+
+/* Tooltip column headers */
+.th-label {
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+}
+
+.th-hint {
+  font-size: 0.7rem;
+  opacity: 0.4;
+  transition: opacity 0.15s;
+}
+
+.th-label:hover .th-hint {
+  opacity: 0.9;
+}
