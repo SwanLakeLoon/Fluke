@@ -418,9 +418,16 @@ export default function Locations() {
                           </td>
                           <td>
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.3rem' }}>
-                              {mappings.length === 0 ? (
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No mappings yet</span>
-                              ) : mappings.map(m => (
+                              {count > 0 && (
+                                <span 
+                                  className="badge" 
+                                  style={{ background: 'var(--bg-accent)', color: 'var(--text-secondary)', border: '1px solid var(--border)', fontSize: '0.75rem' }} 
+                                  title="Sightings natively perfectly match this canonical name."
+                                >
+                                  {ml.name} (Canonical match)
+                                </span>
+                              )}
+                              {mappings.map(m => (
                                 <span key={m.id} className="badge badge-accent" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.75rem' }}>
                                   {m.raw_value}
                                   <button
@@ -430,6 +437,9 @@ export default function Locations() {
                                   >✕</button>
                                 </span>
                               ))}
+                              {mappings.length === 0 && count === 0 && (
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>No mappings yet</span>
+                              )}
                             </div>
                           </td>
                           <td>
