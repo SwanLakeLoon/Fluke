@@ -205,6 +205,12 @@ def lookup_registrations(rows: list[dict], dry_run: bool = False) -> list[dict]:
     print(f"[reg] {len(all_plates)} unique plates across "
           f"{len(set(st for _, st in all_plates))} states", file=sys.stderr)
 
+    if not all_plates:
+        print("[reg] ⚠️  0 plates — skipping DVS lookup", file=sys.stderr)
+        for row in rows:
+            row["match_status"] = ""
+        return rows
+
     if dry_run:
         print("[reg] Dry-run — skipping API calls", file=sys.stderr)
         for row in rows:

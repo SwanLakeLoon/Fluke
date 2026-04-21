@@ -150,11 +150,12 @@ def row_to_csv(r: dict) -> dict:
     match = compute_match(r.get("make", ""), r.get("reg_make", ""))
 
     # Make/Model for the vehicle record:
-    # If registry returned data, use it (more authoritative).
-    # Fall back to Airtable-scraped values.
+    # Preserve the Airtable-scraped values as the primary observation so that 
+    # if there is a discrepancy, it is visible in the Fluke UI.
+    # Fall back to registry data only if Airtable was blank.
     has_reg = bool(r.get("reg_make"))
-    make  = (r.get("reg_make")  or r.get("make")  or "").strip().title()
-    model = (r.get("reg_model") or r.get("model") or "").strip().title()
+    make  = (r.get("make")  or r.get("reg_make")  or "").strip().title()
+    model = (r.get("model") or r.get("reg_model") or "").strip().title()
 
     return {
         "Plate":       r.get("plate", ""),
