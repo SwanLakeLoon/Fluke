@@ -36,10 +36,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
-  const { isAdmin, isApprover, isUploader } = deriveRoles(user);
+  const { isAdmin, isApprover, isUploader, isFullViewer } = deriveRoles(user);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isApprover, isUploader }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isApprover, isUploader, isFullViewer }}>
       {children}
     </AuthContext.Provider>
   );
