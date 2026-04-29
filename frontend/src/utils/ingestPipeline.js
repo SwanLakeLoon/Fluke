@@ -52,33 +52,55 @@ export async function findOrCreateVehicle(pb, record, vinRelationId) {
   let vehicle;
   const isPhysical = record.vin_source === 'Vehicle VIN';
 
-  try {
-    vehicle = await pb
-      .collection('vehicles')
-      .getFirstListItem(`plate = "${record.plate.replace(/"/g, '\\"')}"`);
+  // 1. Normalize 'NO PLATES'
+  const rawPlate = (record.plate || '').trim();
+  const isNoPlate = ['no plates', 'no plate', 'unknown', 'none', 'n/a', 'na'].includes(rawPlate.toLowerCase());
+  const searchPlate = isNoPlate ? 'NO PLATES' : rawPlate;
+  record.plate = searchPlate;
 
-    // Backfill missing fields
-    const updates = {};
-    if (record.searchable && !vehicle.searchable) updates.searchable = true;
-    // Route VIN to the correct relation field based on source
-    if (isPhysical) {
-      if (vinRelationId && !vehicle.physical_vin_relation) updates.physical_vin_relation = vinRelationId;
+  // 2. Determine Lookup Filter
+  let lookupFilter = null;
+  if (isNoPlate) {
+    if (vinRelationId) {
+      lookupFilter = `vin_relation = "${vinRelationId}" || physical_vin_relation = "${vinRelationId}"`;
     } else {
-      if (vinRelationId && !vehicle.vin_relation) updates.vin_relation = vinRelationId;
+      // Transient Fallback: No plate, no VIN -> Always create new vehicle
+      lookupFilter = null;
     }
-    if (record.make         && !vehicle.make)         updates.make = record.make;
-    if (record.model        && !vehicle.model)        updates.model = record.model;
-    if (record.color        && !vehicle.color)        updates.color = record.color;
-    if (record.state        && !vehicle.state)        updates.state = record.state;
-    if (record.registration && !vehicle.registration) updates.registration = record.registration;
+  } else {
+    lookupFilter = `plate = "${searchPlate.replace(/"/g, '\\"')}"`;
+  }
 
-    if (Object.keys(updates).length > 0) {
-      vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+  if (lookupFilter) {
+    try {
+      vehicle = await pb.collection('vehicles').getFirstListItem(lookupFilter);
+
+      // Backfill missing fields
+      const updates = {};
+      if (record.searchable && !vehicle.searchable) updates.searchable = true;
+      if (isPhysical) {
+        if (vinRelationId && !vehicle.physical_vin_relation) updates.physical_vin_relation = vinRelationId;
+      } else {
+        if (vinRelationId && !vehicle.vin_relation) updates.vin_relation = vinRelationId;
+      }
+      if (record.make         && !vehicle.make)         updates.make = record.make;
+      if (record.model        && !vehicle.model)        updates.model = record.model;
+      if (record.color        && !vehicle.color)        updates.color = record.color;
+      if (record.state        && !vehicle.state)        updates.state = record.state;
+      if (record.registration && !vehicle.registration) updates.registration = record.registration;
+
+      if (Object.keys(updates).length > 0) {
+        vehicle = await pb.collection('vehicles').update(vehicle.id, updates);
+      }
+    } catch {
+      // Not found, proceed to create
     }
-  } catch {
-    // Not found — create new vehicle
+  }
+
+  if (!vehicle) {
+    // Create new vehicle
     vehicle = await pb.collection('vehicles').create({
-      plate: record.plate,
+      plate: searchPlate,
       state: record.state,
       make: record.make,
       model: record.model,

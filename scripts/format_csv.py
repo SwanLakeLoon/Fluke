@@ -157,8 +157,12 @@ def row_to_csv(r: dict) -> dict:
     make  = (r.get("make")  or r.get("reg_make")  or "").strip().title()
     model = (r.get("model") or r.get("reg_model") or "").strip().title()
 
+    plate = r.get("plate", "").strip()
+    if plate.lower() in {"no plates", "no plate", "unknown", "none", "n/a", "na"}:
+        plate = "NO PLATES"
+
     return {
-        "Plate":       r.get("plate", ""),
+        "Plate":       plate,
         "State":       r.get("state", ""),
         "Make":        make,
         "Model":       model,
