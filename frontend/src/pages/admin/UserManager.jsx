@@ -123,6 +123,7 @@ export default function UserManager() {
             />
             <select className="select" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
               <option value="user">User</option>
+              <option value="full_viewer">Full Viewer</option>
               <option value="uploader">Uploader</option>
               <option value="approver">Approver</option>
               <option value="admin">Admin</option>
@@ -139,6 +140,8 @@ export default function UserManager() {
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             <span className="badge badge-muted" style={{ justifySelf: 'start' }}>user</span>
             <span>Search only</span>
+            <span className="badge badge-secondary" style={{ justifySelf: 'start' }}>full_viewer</span>
+            <span>Elevated view access. Can search all records.</span>
             <span className="badge" style={{ justifySelf: 'start', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)' }}>uploader</span>
             <span>Search + Upload CSV (staged for approval)</span>
             <span className="badge" style={{ justifySelf: 'start', background: 'rgba(234,179,8,0.15)', color: 'var(--warning)' }}>approver</span>
