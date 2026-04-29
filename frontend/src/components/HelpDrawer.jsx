@@ -165,14 +165,15 @@ export default function HelpDrawer({ isOpen, onClose }) {
                   <ul>
                     <li>Create new users with a username and password.</li>
                     <li>Reset any user's password if they forget it.</li>
-                    <li>Assign one of four roles:</li>
+                    <li>Assign one of five roles:</li>
+                    <ul className="text-sm opacity-80 mt-1 space-y-1 ml-4 list-disc">
+                      <li><strong>User:</strong> Basic access. Can only search explicitly searchable records.</li>
+                      <li><strong>Full Viewer:</strong> Elevated view access. Can search all records in the database.</li>
+                      <li><strong>Uploader:</strong> Can upload CSV data batches.</li>
+                      <li><strong>Approver:</strong> Can review and approve/reject duplicate queues and edits.</li>
+                      <li><strong>Admin:</strong> Full system access, including location management and aliases.</li>
+                    </ul>
                   </ul>
-                  <div className="help-actions-list">
-                    <div><strong>user:</strong> Search only</div>
-                    <div><strong>uploader:</strong> Search + Upload CSV (staged for approval)</div>
-                    <div><strong>approver:</strong> All of uploader + Queues (Approvals &amp; Duplicates)</div>
-                    <div><strong>admin:</strong> Full access: direct ingest, approve, records, users</div>
-                  </div>
                 </div>
               </details>
             </>

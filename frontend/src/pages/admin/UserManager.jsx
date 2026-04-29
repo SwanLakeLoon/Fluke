@@ -176,6 +176,7 @@ export default function UserManager() {
                       u.role === 'admin' ? 'badge-accent' 
                       : u.role === 'approver' ? 'badge-warning'
                       : u.role === 'uploader' ? 'badge-info'
+                      : u.role === 'full_viewer' ? 'badge-secondary'
                       : 'badge-muted'
                     }`}>
                       {u.role || 'user'}
@@ -192,10 +193,11 @@ export default function UserManager() {
                         onChange={(e) => handleChangeRole(u, e.target.value)}
                         style={{ paddingRight: '24px', fontSize: '0.8rem', background: 'transparent' }}
                       >
-                        <option value="user">User</option>
-                        <option value="uploader">Uploader</option>
-                        <option value="approver">Approver</option>
-                        <option value="admin">Admin</option>
+                        <option value="user">user</option>
+                        <option value="full_viewer">full_viewer</option>
+                        <option value="uploader">uploader</option>
+                        <option value="approver">approver</option>
+                        <option value="admin">admin</option>
                       </select>
                     </div>
                   </td>

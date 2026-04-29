@@ -75,7 +75,7 @@ def main():
         if users_col:
             fields = users_col.get("fields", users_col.get("schema", []))
             role_field = next((f for f in fields if f["name"] == "role"), None)
-            needed = {"user", "uploader", "approver", "admin"}
+            needed = {"user", "full_viewer", "uploader", "approver", "admin"}
             if role_field:
                 if needed.issubset(set(role_field.get("values", []))):
                     print("⏭️  users.role has required fields")
@@ -234,9 +234,9 @@ def main():
 
         for c_name in ["vins", "vehicles", "sightings", "enhanced_plate_stats", "enhanced_vin_stats"]:
             if c_name in ["vehicles", "enhanced_plate_stats", "enhanced_vin_stats"]:
-                list_view = '(@request.auth.id != "" && searchable = true) || @request.auth.role ?= "admin"'
+                list_view = '(@request.auth.id != "" && searchable = true) || @request.auth.role ?= "admin" || @request.auth.role ?= "full_viewer"'
             elif c_name == "sightings":
-                list_view = '(@request.auth.id != "" && vehicle.searchable = true) || @request.auth.role ?= "admin"'
+                list_view = '(@request.auth.id != "" && vehicle.searchable = true) || @request.auth.role ?= "admin" || @request.auth.role ?= "full_viewer"'
             else:
                 list_view = '(@request.auth.id != "") || @request.auth.role ?= "admin"'
                 

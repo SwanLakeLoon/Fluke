@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { pb } from '../api/client';
+import { useAuth } from '../hooks/useAuth';
 import VehicleCard from '../components/VehicleCard';
 import './Search.css';
 
@@ -7,6 +8,7 @@ const PER_PAGE = 25;
 const DEBOUNCE_MS = 300;
 
 export default function Search() {
+  const { isFullViewer } = useAuth();
   const [filters, setFilters] = useState({
     plate: '', state: '', ice: '', match_status: '', vin: '', location: '', sightings: '',
   });
@@ -28,7 +30,8 @@ export default function Search() {
   // Build filter string for enhanced_plate_stats view
   const buildFilter = useCallback(() => {
     const esc = (s) => s.replace(/"/g, '\\"');
-    const parts = ['searchable = true'];
+    const parts = [];
+    if (!isFullViewer) parts.push('searchable = true');
     if (filters.plate)        parts.push(`plate ~ "${esc(filters.plate)}"`);
     if (filters.state)         parts.push(`state_list ~ "${esc(filters.state)}"`);
     if (filters.ice)           parts.push(`ice_list ~ "${esc(filters.ice)}"`);
@@ -37,12 +40,12 @@ export default function Search() {
     if (filters.location)      parts.push(`location_list ~ "${esc(filters.location)}"`);
     if (filters.sightings)     parts.push(`sighting_count >= ${parseInt(filters.sightings, 10) || 0}`);
     return parts.join(' && ');
-  }, [filters]);
+  }, [filters, isFullViewer]);
 
   // Debounced search
   useEffect(() => {
     const anyFilter = Object.values(filters).some(v => v.trim() !== '');
-    if (!anyFilter) {
+    if (!anyFilter && !isFullViewer) {
       setHasSearched(false);
       setVehicles([]);
       setTotalItems(0);
@@ -100,7 +103,7 @@ export default function Search() {
     setPage(1);
   };
 
-  const isHeroState = !hasSearched;
+  const isHeroState = !hasSearched && !isFullViewer;
 
   return (
     <div className="page">
