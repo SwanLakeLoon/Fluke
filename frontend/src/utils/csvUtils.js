@@ -1,3 +1,5 @@
+import makeAliases from './makeAliases.json';
+
 export const COLUMN_MAP = {
   'Plate': 'plate',
   'State': 'state',
@@ -35,6 +37,17 @@ export const COLOR_ALIASES = {
   'purple': 'PU',
   'orange': 'OR'
 };
+
+export function normalizeMake(makeStr) {
+  if (!makeStr) return '';
+  const upperMake = makeStr.trim().toUpperCase();
+  for (const [canonical, aliases] of Object.entries(makeAliases)) {
+    if (upperMake === canonical.toUpperCase() || aliases.includes(upperMake)) {
+      return canonical;
+    }
+  }
+  return makeStr.trim();
+}
 
 export function parseDateString(dateStr) {
   if (!dateStr) return null;
@@ -109,6 +122,9 @@ export function mapRow(csvRow) {
   if (noPlatesVariants.includes(mapped.plate.toLowerCase())) {
     mapped.plate = 'NO PLATES';
   }
+
+  // Normalize Make
+  mapped.make = normalizeMake(mapped.make);
 
   // Normalize enum fields to uppercase early so downstream logic is consistent
   if (mapped.color) {

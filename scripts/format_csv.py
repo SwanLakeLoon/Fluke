@@ -37,6 +37,15 @@ import argparse
 import csv
 import json
 import sys
+import os
+
+ALIASES_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "src", "utils", "makeAliases.json")
+try:
+    with open(ALIASES_PATH, "r") as f:
+        MAKE_ALIASES_DICT = json.load(f)
+except Exception as e:
+    print(f"Warning: Could not load makeAliases.json: {e}")
+    MAKE_ALIASES_DICT = {}
 
 TEMPLATE_COLUMNS = [
     "Plate",
@@ -58,43 +67,21 @@ TEMPLATE_COLUMNS = [
 
 IMPORT_SOURCE = "airtable-hot-dishes"
 
-# Make aliases — groups of strings that refer to the same manufacturer.
-# Used to determine Match: Y if reg make and observed make are in the same group.
-MAKE_ALIAS_GROUPS: list[set[str]] = [
-    {"CHEVROLET", "CHEVY"},
-    {"DODGE", "RAM"},
-    {"VOLKSWAGEN", "VW"},
-    {"FORD"},
-    {"HONDA"},
-    {"TOYOTA"},
-    {"NISSAN"},
-    {"JEEP"},
-    {"CHRYSLER"},
-    {"KIA"},
-    {"HYUNDAI"},
-    {"SUBARU"},
-    {"GMC"},
-    {"BUICK"},
-    {"MAZDA"},
-    {"MITSUBISHI"},
-    {"LINCOLN"},
-    {"CADILLAC"},
-    {"ACURA"},
-    {"LEXUS"},
-    {"INFINITI"},
-    {"BMW"},
-    {"MERCEDES", "MERCEDES-BENZ"},
-    {"AUDI"},
-    {"VOLVO"},
-    {"LAND ROVER"},
-]
+def normalize_make(make: str) -> str:
+    """Normalize a make string to its canonical name using the shared JSON config."""
+    if not make:
+        return ""
+    upper = make.upper().strip()
+    for canonical, aliases in MAKE_ALIASES_DICT.items():
+        if upper == canonical.upper() or upper in aliases:
+            return canonical
+    return make.strip().title()
 
 def _make_group(make: str) -> set[str] | None:
-    """Return the alias group for a make string, or None if not found."""
-    upper = make.upper().strip()
-    for group in MAKE_ALIAS_GROUPS:
-        if upper in group:
-            return group
+    """Return a single-item set containing the canonical make for matching logic."""
+    canon = normalize_make(make)
+    if canon:
+        return {canon.upper()}
     return None
 
 
@@ -154,7 +141,8 @@ def row_to_csv(r: dict) -> dict:
     # if there is a discrepancy, it is visible in the Fluke UI.
     # Fall back to registry data only if Airtable was blank.
     has_reg = bool(r.get("reg_make"))
-    make  = (r.get("make")  or r.get("reg_make")  or "").strip().title()
+    make_raw  = (r.get("make")  or r.get("reg_make")  or "").strip()
+    make = normalize_make(make_raw)
     model = (r.get("model") or r.get("reg_model") or "").strip().title()
 
     plate = r.get("plate", "").strip()

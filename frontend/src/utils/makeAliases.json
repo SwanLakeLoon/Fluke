@@ -1,0 +1,8 @@
+{
+  "Chevrolet": ["CHEVY", "CHEV"],
+  "Volkswagen": ["VW", "VOLKS"],
+  "Mercedes-Benz": ["MERCEDES", "MB"],
+  "Dodge": ["RAM"],
+  "Land Rover": ["RANGE ROVER"],
+  "Alfa Romeo": ["ALFA"]
+}

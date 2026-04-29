@@ -98,9 +98,12 @@ export async function findOrCreateVehicle(pb, record, vinRelationId) {
   }
 
   if (!vehicle) {
+    // Generate a unique suffix for transient plateless vehicles to bypass DB unique constraint
+    const finalPlate = (isNoPlate && !vinRelationId) ? `${searchPlate} (${crypto.randomUUID().slice(0, 8).toUpperCase()})` : searchPlate;
+    
     // Create new vehicle
     vehicle = await pb.collection('vehicles').create({
-      plate: searchPlate,
+      plate: finalPlate,
       state: record.state,
       make: record.make,
       model: record.model,
