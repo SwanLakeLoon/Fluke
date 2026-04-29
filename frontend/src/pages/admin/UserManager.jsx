@@ -140,7 +140,7 @@ export default function UserManager() {
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
             <span className="badge badge-muted" style={{ justifySelf: 'start' }}>user</span>
             <span>Search only</span>
-            <span className="badge badge-secondary" style={{ justifySelf: 'start' }}>full_viewer</span>
+            <span className="badge badge-success" style={{ justifySelf: 'start' }}>full_viewer</span>
             <span>Elevated view access. Can search all records.</span>
             <span className="badge" style={{ justifySelf: 'start', background: 'rgba(56,189,248,0.15)', color: 'var(--accent)' }}>uploader</span>
             <span>Search + Upload CSV (staged for approval)</span>
@@ -179,7 +179,7 @@ export default function UserManager() {
                       u.role === 'admin' ? 'badge-accent' 
                       : u.role === 'approver' ? 'badge-warning'
                       : u.role === 'uploader' ? 'badge-info'
-                      : u.role === 'full_viewer' ? 'badge-secondary'
+                      : u.role === 'full_viewer' ? 'badge-success'
                       : 'badge-muted'
                     }`}>
                       {u.role || 'user'}
