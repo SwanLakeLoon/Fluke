@@ -221,6 +221,16 @@ def scrape(dump_raw: str | None = None) -> list[dict]:
         )
         page = context.new_page()
 
+        def on_route(route):
+            """Force Airtable to return JSON instead of MsgPack."""
+            url = route.request.url
+            if "readForSharedPages" in url:
+                url = url.replace("allowMsgpackOfResultIfEnabled%22%3Atrue", "allowMsgpackOfResultIfEnabled%22%3Afalse")
+                url = url.replace("allowMsgpackOfResultIfEnabled=true", "allowMsgpackOfResultIfEnabled=false")
+            route.continue_(url=url)
+
+        page.route("**/*", on_route)
+
         def on_response(response):
             nonlocal target_payload
             if "readForSharedPages" not in response.url:
@@ -253,7 +263,7 @@ def scrape(dump_raw: str | None = None) -> list[dict]:
 
     if target_payload is None:
         print("[scraper] ❌ No readForSharedPages response captured.", file=sys.stderr)
-        return []
+        sys.exit(1)
 
     if dump_raw:
         Path(dump_raw).write_text(json.dumps(target_payload, indent=2))
