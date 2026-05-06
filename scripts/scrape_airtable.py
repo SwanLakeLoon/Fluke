@@ -212,24 +212,18 @@ def scrape(dump_raw: str | None = None) -> list[dict]:
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         context = browser.new_context(
-            viewport={"width": 1440, "height": 900},
-            user_agent=(
-                "Mozilla/5.0 (X11; Linux x86_64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/122.0.0.0 Safari/537.36"
-            ),
+            viewport={"width": 1440, "height": 900}
         )
         page = context.new_page()
 
         def on_route(route):
             """Force Airtable to return JSON instead of MsgPack."""
             url = route.request.url
-            if "readForSharedPages" in url:
-                url = url.replace("allowMsgpackOfResultIfEnabled%22%3Atrue", "allowMsgpackOfResultIfEnabled%22%3Afalse")
-                url = url.replace("allowMsgpackOfResultIfEnabled=true", "allowMsgpackOfResultIfEnabled=false")
+            url = url.replace("allowMsgpackOfResultIfEnabled%22%3Atrue", "allowMsgpackOfResultIfEnabled%22%3Afalse")
+            url = url.replace("allowMsgpackOfResultIfEnabled=true", "allowMsgpackOfResultIfEnabled=false")
             route.continue_(url=url)
 
-        page.route("**/*", on_route)
+        page.route("**/*readForSharedPages*", on_route)
 
         def on_response(response):
             nonlocal target_payload
