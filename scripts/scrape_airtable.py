@@ -216,14 +216,21 @@ def scrape(dump_raw: str | None = None) -> list[dict]:
         )
         page = context.new_page()
 
-        def on_route(route):
-            """Force Airtable to return JSON instead of MsgPack."""
-            url = route.request.url
-            url = url.replace("allowMsgpackOfResultIfEnabled%22%3Atrue", "allowMsgpackOfResultIfEnabled%22%3Afalse")
-            url = url.replace("allowMsgpackOfResultIfEnabled=true", "allowMsgpackOfResultIfEnabled=false")
-            route.continue_(url=url)
-
-        page.route("**/*readForSharedPages*", on_route)
+        page.add_init_script("""
+            const originalFetch = window.fetch;
+            window.fetch = async function(...args) {
+                if (typeof args[0] === 'string' && args[0].includes('readForSharedPages')) {
+                    args[0] = args[0].replace('allowMsgpackOfResultIfEnabled%22%3Atrue', 'allowMsgpackOfResultIfEnabled%22%3Afalse');
+                    args[0] = args[0].replace('allowMsgpackOfResultIfEnabled=true', 'allowMsgpackOfResultIfEnabled=false');
+                } else if (args[0] instanceof Request && args[0].url.includes('readForSharedPages')) {
+                    let url = args[0].url;
+                    url = url.replace('allowMsgpackOfResultIfEnabled%22%3Atrue', 'allowMsgpackOfResultIfEnabled%22%3Afalse');
+                    url = url.replace('allowMsgpackOfResultIfEnabled=true', 'allowMsgpackOfResultIfEnabled=false');
+                    args[0] = new Request(url, args[0]);
+                }
+                return originalFetch.apply(this, args);
+            };
+        """)
 
         def on_response(response):
             nonlocal target_payload
