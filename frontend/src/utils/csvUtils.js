@@ -18,7 +18,7 @@ export const COLUMN_MAP = {
   'VIN Source': 'vin_source',
 };
 
-export const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR']);
+export const VALID_COLORS = new Set(['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR', 'YE', 'CR']);
 export const VALID_ICE = new Set(['Y', 'N', 'HS']);
 export const VALID_MATCH = new Set(['Y', 'N', '']);
 
@@ -35,7 +35,9 @@ export const COLOR_ALIASES = {
   'green': 'GN',
   'gold': 'GD',
   'purple': 'PU',
-  'orange': 'OR'
+  'orange': 'OR',
+  'yellow': 'YE',
+  'cream': 'CR'
 };
 
 export function normalizeMake(makeStr) {

@@ -25,8 +25,8 @@ describe('colorMap', () => {
   });
 
   it('contains all 12 expected color constants', () => {
-    const expectedKeys = ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR'];
+    const expectedKeys = ['BR', 'GR', 'BK', 'BL', 'TN', 'SL', 'R', 'WH', 'GN', 'GD', 'PU', 'OR', 'YE', 'CR'];
     expect(Object.keys(COLOR_MAP)).toEqual(expect.arrayContaining(expectedKeys));
-    expect(Object.keys(COLOR_MAP)).toHaveLength(12);
+    expect(Object.keys(COLOR_MAP)).toHaveLength(14);
   });
 });

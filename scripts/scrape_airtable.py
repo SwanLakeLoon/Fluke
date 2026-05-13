@@ -65,6 +65,8 @@ COLOR_MAP = {
     "gold":        "GD",
     "purple":      "PU",
     "orange":      "OR",
+    "yellow":      "YE",
+    "cream":       "CR",
 }
 
 STATE_RE = re.compile(r"^([A-Z]{2})\s*[-–]")

@@ -14,6 +14,8 @@ export const COLOR_MAP = {
   GD: { name: 'Gold',   hex: '#EAB308' },
   PU: { name: 'Purple', hex: '#A855F7' },
   OR: { name: 'Orange', hex: '#F97316' },
+  YE: { name: 'Yellow', hex: '#EAB308' },
+  CR: { name: 'Cream',  hex: '#FFFDD0' },
 };
 
 export function getColorInfo(abbr) {

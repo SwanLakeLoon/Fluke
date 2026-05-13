@@ -45,7 +45,7 @@ COLUMN_MAP = {
     "VIN Source":                                 "vin_source",
 }
 
-VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR"}
+VALID_COLORS = {"BR", "GR", "BK", "BL", "TN", "SL", "R", "WH", "GN", "GD", "PU", "OR", "YE", "CR"}
 VALID_ICE    = {"Y", "N", "HS", "C"}
 VALID_MATCH  = {"Y", "N", ""}
 
