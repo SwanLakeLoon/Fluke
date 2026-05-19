@@ -348,7 +348,18 @@ export default function CsvUpload() {
                         </select>
                       </td>
                       <td>{r.mapped.ice || '—'}</td>
-                      <td>{r.mapped.searchable ? 'Yes' : 'No'}</td>
+                      <td>
+                        {isAdmin ? (
+                          <input
+                            type="checkbox"
+                            checked={!!r.mapped.searchable}
+                            onChange={e => handleFieldChange(r.index, 'searchable', e.target.checked)}
+                            disabled={importing}
+                          />
+                        ) : (
+                          r.mapped.searchable ? 'Yes' : 'No'
+                        )}
+                      </td>
                       <td>
                         <input
                           className="input input-sm"
