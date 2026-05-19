@@ -58,6 +58,9 @@ def map_row(csv_row: dict) -> dict:
         val = csv_row.get(csv_col, "").strip()
         mapped[db_field] = val
         
+    if mapped.get("plate"):
+        mapped["plate"] = mapped["plate"].upper()
+
     # Normalize missing plates
     if mapped.get("plate", "").lower() in {"no plates", "no", "missing", "none", "nothing"}:
         mapped["plate"] = "NO PLATES"

@@ -196,7 +196,7 @@ def lookup_registrations(rows: list[dict], dry_run: bool = False) -> list[dict]:
     all_plates: list[tuple[str, str]] = []
     seen: set[str] = set()
     for row in rows:
-        plate = row["plate"]
+        plate = row["plate"].upper().strip()
         state = row.get("state", "")
         if plate not in seen:
             all_plates.append((plate, state))
@@ -245,7 +245,7 @@ def lookup_registrations(rows: list[dict], dry_run: bool = False) -> list[dict]:
     # Annotate each original row
     matched = not_found = unknown = 0
     for row in rows:
-        plate = row["plate"]
+        plate = row["plate"].upper().strip()
         result = plate_results.get(plate)
         if result is None:
             row["match_status"] = ""

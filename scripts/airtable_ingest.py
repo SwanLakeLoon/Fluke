@@ -234,6 +234,7 @@ def main():
             print(f"📍  Loaded {len(location_map)} location mappings for auto-normalization")
 
         for i, row in enumerate(valid_rows, 1):
+            row["plate"] = row["plate"].upper().strip()
             plate = row["plate"]
 
             vehicle_id = upsert_vehicle(client, headers, row, cache)

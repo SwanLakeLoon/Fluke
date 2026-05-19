@@ -124,6 +124,12 @@ describe('csvUtils', () => {
       expect(result.make).toBe('Toyota');
     });
 
+    it('normalizes plate to uppercase', () => {
+      const row = { 'Plate': '  xyz 789  ' };
+      const result = mapRow(row);
+      expect(result.plate).toBe('XYZ 789');
+    });
+
     it('normalizes missing plate variations to NO PLATES', () => {
       expect(mapRow({ 'Plate': 'No Plates' }).plate).toBe('NO PLATES');
       expect(mapRow({ 'Plate': 'no' }).plate).toBe('NO PLATES');

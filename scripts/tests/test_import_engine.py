@@ -3,7 +3,7 @@ from scripts.import_engine import map_row, validate_row, derive_searchable, buil
 
 def test_map_row():
     row = {
-        "Plate": "ABC 123",
+        "Plate": "abc 123",
         "State": " CA ",
         "Make": "Ford",
         "Color": "WH",

@@ -119,6 +119,10 @@ export function mapRow(csvRow) {
     mapped[dbField] = (lowerRow[csvCol.toLowerCase()] || '').toString().trim();
   }
   
+  if (mapped.plate) {
+    mapped.plate = mapped.plate.toUpperCase();
+  }
+  
   // Normalize missing plates
   const noPlatesVariants = ['no plates', 'no', 'missing', 'none', 'nothing'];
   if (noPlatesVariants.includes(mapped.plate.toLowerCase())) {
